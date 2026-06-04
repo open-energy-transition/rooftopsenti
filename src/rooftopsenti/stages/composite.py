@@ -136,7 +136,16 @@ def _composite_s2mosaic(
 
 
 def run(cfg: Config, store: ArtifactStore, only_tiles: list[str] | None = None) -> None:
+    import os
+
     import rioxarray  # noqa: F401  (registers .rio accessor)
+
+    # Allow parallel tile workers to share cores/RAM (see README scaling notes)
+    n_threads = os.environ.get("ROOFTOPSENTI_DASK_THREADS")
+    if n_threads:
+        import dask
+
+        dask.config.set(scheduler="threads", num_workers=int(n_threads))
 
     cfg_slice = cfg.imagery.model_dump(mode="json")
     boundary = aoi.load_boundary(store)

@@ -1,0 +1,25 @@
+2026-06-04 16:14:08.218 | INFO     | rooftopsenti.cli:_setup:26 - Region: netherlands (run id 80f487dcb1)
+2026-06-04 16:14:08.218 | INFO     | rooftopsenti.stages.aoi:_fetch_geoboundaries:21 - Fetching geoBoundaries metadata: https://www.geoboundaries.org/api/current/gbOpen/NLD/ADM0/
+2026-06-04 16:14:08.750 | INFO     | rooftopsenti.stages.aoi:_fetch_geoboundaries:25 - Downloading boundary GeoJSON: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/NLD/ADM0/geoBoundaries-NLD-ADM0.geojson
+2026-06-04 16:14:10.245 | INFO     | rooftopsenti.stages.aoi:run:74 - AOI resolved: 16 MGRS tiles: ['31UES', '31UET', '31UFS', '31UFT', '31UFU', '31UFV', '31UGS', '31UGT', '31UGU', '32UKB', '32UKC', '32UKD', '32ULB', '32ULC', '32ULD', '32ULE']
+2026-06-04 16:22:43.143 | INFO     | rooftopsenti.overture:solar_generators:92 - Overture: 90127 solar generator polygon(s) in bbox
+2026-06-04 16:34:57.681 | INFO     | rooftopsenti.overture:buildings_intersecting:201 - Overture: 539 building(s) intersect the given features
+2026-06-04 16:34:57.886 | INFO     | rooftopsenti.stages.osm_labels:run:150 - Fetched 74660 solar polygon(s) in AOI
+2026-06-04 16:34:58.373 | INFO     | rooftopsenti.stages.osm_labels:run:152 - Fetched 539 building polygon(s) intersecting large solar
+2026-06-04 16:34:59.088 | INFO     | rooftopsenti.stages.osm_labels:run:156 - Built 679 rooftop solar label(s) (≥1000.0 m²)
+2026-06-04 16:35:07.978 | INFO     | rooftopsenti.stages.composite:_search_items:61 - 31UES: 104 STAC items in 2023-04-01..2023-09-30
+2026-06-04 16:35:38.223 | INFO     | rooftopsenti.stages.composite:run:162 - 31UES range 0: computing median composite ...
+/home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-packages/rasterio/warp.py:385: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
+  dest = _reproject(
+2026-06-04 20:01:04.163 | INFO     | rooftopsenti.cli:_setup:26 - Region: netherlands (run id 80f487dcb1)
+2026-06-04 20:01:04.164 | INFO     | rooftopsenti.stages.aoi:run:61 - AOI artifacts fresh — skipping
+2026-06-04 20:01:04.164 | INFO     | rooftopsenti.stages.osm_labels:run:141 - OSM labels fresh — skipping
+2026-06-04 20:01:12.440 | INFO     | rooftopsenti.stages.composite:_search_items:61 - 31UES: 104 STAC items in 2023-04-01..2023-09-30
+2026-06-04 20:01:44.041 | INFO     | rooftopsenti.stages.composite:run:162 - 31UES range 0: computing median composite ...
+/home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-packages/rasterio/warp.py:385: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
+  dest = _reproject(
+2026-06-04 23:35:24.805 | INFO     | rooftopsenti.cli:_setup:26 - Region: netherlands (run id 80f487dcb1)
+2026-06-04 23:35:24.806 | INFO     | rooftopsenti.stages.aoi:run:61 - AOI artifacts fresh — skipping
+2026-06-04 23:35:24.807 | INFO     | rooftopsenti.stages.osm_labels:run:141 - OSM labels fresh — skipping
+2026-06-04 23:35:32.809 | INFO     | rooftopsenti.stages.composite:_search_items:61 - 31UES: 104 STAC items in 2023-04-01..2023-09-30
+2026-06-04 23:36:03.615 | INFO     | rooftopsenti.stages.composite:run:162 - 31UES range 0: computing median composite ...

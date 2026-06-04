@@ -38,7 +38,34 @@ def register_composite(
     date_range: tuple[str, str],
     bands: list[str],
 ) -> pystac.Item:
-    """Add (or replace) a STAC item for one composite COG and save the catalog."""
+    """Add (or replace) a STAC item for one composite COG and save the catalog.
+
+    Guarded by a file lock so parallel composite workers can register items
+    without racing on the catalog's read-modify-write.
+    """
+    import fcntl
+
+    catalog_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = catalog_path.with_suffix(".lock")
+    with open(lock_path, "w") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            return _register_composite_locked(
+                catalog_path, region, tile, range_idx, cog_path, date_range, bands
+            )
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+def _register_composite_locked(
+    catalog_path: Path,
+    region: str,
+    tile: str,
+    range_idx: int,
+    cog_path: Path,
+    date_range: tuple[str, str],
+    bands: list[str],
+) -> pystac.Item:
     catalog = _open_or_create(catalog_path, region)
 
     with rasterio.open(cog_path) as src:
