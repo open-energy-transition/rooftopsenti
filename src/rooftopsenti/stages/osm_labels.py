@@ -1,8 +1,14 @@
-"""Stage b) OSM training labels: large rooftop solar polygons via Overpass.
+"""Stage b) OSM training labels: large rooftop solar polygons.
 
 Positives are OSM solar generator polygons that (a) meet the minimum area for
 Sentinel-2 detectability and (b) are rooftop installations — either tagged
 ``location=roof`` (or variants) or spatially intersecting a building polygon.
+
+Backends (``osm.source``):
+- ``overture`` (default) — OSM data redistributed by Overture Maps as
+  bbox-queryable GeoParquet; original tags preserved in ``source_tags``.
+  No rate limits; snapshot lags live OSM by up to ~a month.
+- ``overpass`` — live OSM via the Overpass API (chunked, cached, mirrored).
 """
 
 from __future__ import annotations
@@ -11,6 +17,7 @@ import geopandas as gpd
 import pandas as pd
 from loguru import logger
 
+from .. import overture
 from ..config import Config
 from ..geo import WGS84, bbox_grid, clip_to_geom, filter_min_area
 from ..io_artifacts import ArtifactStore, write_gdf
@@ -99,19 +106,21 @@ def _cell_box(cell):
     return box(*cell)
 
 
-def run(cfg: Config, store: ArtifactStore) -> None:
-    cfg_slice = {"osm": cfg.osm.model_dump(mode="json"), "aoi": cfg.aoi.model_dump(mode="json")}
-    if store.is_fresh(store.osm_labels, cfg_slice, inputs=[store.aoi_boundary]):
-        logger.info("OSM labels fresh — skipping")
-        return
+def _fetch_via_overture(
+    boundary, cfg: Config
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    solar = overture.solar_generators(cfg.overture.release, boundary.bounds)
+    solar = clip_to_geom(solar, boundary).reset_index(drop=True)
+    large_solar = filter_min_area(solar, cfg.osm.solar_area_min_m2)
+    buildings = overture.buildings_intersecting(cfg.overture.release, large_solar)
+    return solar, buildings
 
-    boundary = aoi.load_boundary(store)
+
+def _fetch_via_overpass(
+    boundary, cfg: Config, store: ArtifactStore
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     client = OverpassClient(cfg.osm.overpass_url, cfg.osm.timeout_s, store.overpass_cache)
-
     solar = _fetch_solar(client, boundary, cfg)
-    logger.info("Fetched {} solar polygon(s) in AOI", len(solar))
-    write_gdf(solar, store.osm_solar)
-
     # Only fetch buildings near *large* solar — that's all the rooftop rule needs
     large_solar = filter_min_area(solar, cfg.osm.solar_area_min_m2)
     buildings = (
@@ -119,7 +128,28 @@ def run(cfg: Config, store: ArtifactStore) -> None:
         if not large_solar.empty
         else elements_to_polygons([])
     )
-    logger.info("Fetched {} building polygon(s) near large solar", len(buildings))
+    return solar, buildings
+
+
+def run(cfg: Config, store: ArtifactStore) -> None:
+    cfg_slice = {
+        "osm": cfg.osm.model_dump(mode="json"),
+        "overture": cfg.overture.model_dump(mode="json"),
+        "aoi": cfg.aoi.model_dump(mode="json"),
+    }
+    if store.is_fresh(store.osm_labels, cfg_slice, inputs=[store.aoi_boundary]):
+        logger.info("OSM labels fresh — skipping")
+        return
+
+    boundary = aoi.load_boundary(store)
+    if cfg.osm.source == "overture":
+        solar, buildings = _fetch_via_overture(boundary, cfg)
+    else:
+        solar, buildings = _fetch_via_overpass(boundary, cfg, store)
+
+    logger.info("Fetched {} solar polygon(s) in AOI", len(solar))
+    write_gdf(solar, store.osm_solar)
+    logger.info("Fetched {} building polygon(s) intersecting large solar", len(buildings))
     write_gdf(buildings, store.osm_buildings)
 
     labels = build_labels(solar, buildings, cfg)

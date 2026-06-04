@@ -119,35 +119,12 @@ def _fetch_gba(boundary, cfg: Config) -> gpd.GeoDataFrame:
 
 # -------------------------------------------------------------- Overture ----
 def _fetch_overture(boundary, cfg: Config) -> gpd.GeoDataFrame:
-    import duckdb
-    from shapely import from_wkb
+    from .. import overture
 
-    w, s, e, n = boundary.bounds
-    path = (
-        f"s3://overturemaps-us-west-2/release/{cfg.gba.overture_release}"
-        "/theme=buildings/type=building/*"
+    logger.info(
+        "Querying Overture buildings {} for bbox {}", cfg.overture.release, boundary.bounds
     )
-    logger.info("Querying Overture buildings {} for bbox {}", cfg.gba.overture_release, (w, s, e, n))
-    con = duckdb.connect()
-    con.execute("INSTALL httpfs; LOAD httpfs; INSTALL spatial; LOAD spatial;")
-    con.execute("SET s3_region='us-west-2';")
-    rows = con.execute(
-        f"""
-        SELECT id, ST_AsWKB(geometry) AS wkb
-        FROM read_parquet('{path}', hive_partitioning=1)
-        WHERE bbox.xmin <= ? AND bbox.xmax >= ?
-          AND bbox.ymin <= ? AND bbox.ymax >= ?
-        """,
-        [e, w, n, s],
-    ).fetchall()
-    con.close()
-    if not rows:
-        return gpd.GeoDataFrame({"source": []}, geometry=[], crs=WGS84)
-    ids, wkbs = zip(*rows, strict=True)
-    gdf = gpd.GeoDataFrame(
-        {"id": ids, "source": "overture"}, geometry=from_wkb(list(wkbs)), crs=WGS84
-    )
-    return gdf
+    return overture.buildings_in_bbox(cfg.overture.release, boundary.bounds)
 
 
 # ------------------------------------------------------------------ stage ----

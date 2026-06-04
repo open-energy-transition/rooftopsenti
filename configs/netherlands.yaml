@@ -7,7 +7,11 @@ aoi:
   admin_level: 0             # 0 = country, 1 = state/province
   admin_name: null           # set together with admin_level: 1 for a single province
 
+overture:
+  release: "2026-05-20.0"
+
 osm:
+  source: overture           # overture (default, no rate limits) | overpass (live OSM)
   overpass_url: https://overpass-api.de/api/interpreter
   solar_area_min_m2: 1000    # ~10 Sentinel-2 pixels
   rooftop_rule: intersect_or_roof_tag   # roof tag OR intersects a building polygon

@@ -34,7 +34,12 @@ class AOIConfig(BaseModel):
         return self
 
 
+class OvertureConfig(BaseModel):
+    release: str = "2026-05-20.0"
+
+
 class OSMConfig(BaseModel):
+    source: Literal["overture", "overpass"] = "overture"
     overpass_url: str = "https://overpass-api.de/api/interpreter"
     solar_area_min_m2: float = 1000.0
     rooftop_rule: Literal["intersect_or_roof_tag", "roof_tag_only", "intersect_only"] = (
@@ -72,7 +77,6 @@ class GBAConfig(BaseModel):
     # GBA footprints are split across two HF repos (ODbL bulk + non-ODbL extras)
     hf_repo_odbl: str = "zhu-xlab/GBA.ODbLPolygon"
     hf_repo_extra: str = "zhu-xlab/GBA.LoD1"
-    overture_release: str = "2026-05-20.0"
     building_area_min_m2: float = 1000.0
 
 
@@ -123,6 +127,7 @@ class SplitConfig(BaseModel):
 class Config(BaseModel):
     region: str
     aoi: AOIConfig
+    overture: OvertureConfig = OvertureConfig()
     osm: OSMConfig = OSMConfig()
     imagery: ImageryConfig
     gba: GBAConfig = GBAConfig()
@@ -146,6 +151,7 @@ class Config(BaseModel):
         relevant = {
             "region": self.region,
             "imagery": self.imagery.model_dump(mode="json"),
+            "overture": self.overture.model_dump(mode="json"),
             "osm": self.osm.model_dump(mode="json"),
             "model": self.model.model_dump(mode="json"),
             "chips": self.chips.model_dump(mode="json"),

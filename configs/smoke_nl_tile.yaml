@@ -6,7 +6,11 @@ aoi:
   source: bbox
   bbox: [6.10, 51.30, 6.25, 51.45]   # W, S, E, N (Venlo logistics corridor)
 
+overture:
+  release: "2026-05-20.0"
+
 osm:
+  source: overture           # overture (default, no rate limits) | overpass (live OSM)
   overpass_url: https://overpass-api.de/api/interpreter
   solar_area_min_m2: 1000
   rooftop_rule: intersect_or_roof_tag
