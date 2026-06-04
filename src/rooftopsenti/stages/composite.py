@@ -90,7 +90,7 @@ def _scl_median_composite(
         comp = data.median(dim="time", skipna=True)
     comp = comp.fillna(NODATA).round().astype("uint16")
     comp = comp.assign_coords(band=bands)
-    comp.rio.write_crs(ds.odc.crs, inplace=True)
+    comp.rio.write_crs(str(ds.odc.crs), inplace=True)
     comp.rio.write_nodata(NODATA, inplace=True)
     return comp
 

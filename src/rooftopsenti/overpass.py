@@ -20,13 +20,21 @@ from shapely.ops import unary_union
 
 from .geo import WGS84
 
-RETRY_STATUS = {429, 502, 503, 504}
-MAX_RETRIES = 6
+RETRY_STATUS = {406, 429, 502, 503, 504}
+MAX_RETRIES = 8
+
+# Public mirrors rotated on retry when the primary instance load-sheds.
+MIRRORS = [
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+]
+
+USER_AGENT = "rooftopsenti/0.1 (large rooftop solar PV mapping; +https://github.com)"
 
 
 class OverpassClient:
     def __init__(self, url: str, timeout_s: int, cache_dir: Path):
-        self.url = url
+        self.urls = [url] + [m for m in MIRRORS if m != url]
         self.timeout_s = timeout_s
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -35,15 +43,21 @@ class OverpassClient:
         return self.cache_dir / f"{hashlib.sha256(ql.encode()).hexdigest()[:24]}.json"
 
     def query(self, ql: str) -> dict:
-        """POST an Overpass QL query; cached on disk, retried with backoff."""
+        """POST an Overpass QL query; cached on disk, retried across mirrors."""
         cache = self._cache_path(ql)
         if cache.exists():
             return json.loads(cache.read_text())
 
         delay = 5.0
         for attempt in range(MAX_RETRIES):
+            url = self.urls[attempt % len(self.urls)]
             try:
-                resp = httpx.post(self.url, data={"data": ql}, timeout=self.timeout_s)
+                resp = httpx.post(
+                    url,
+                    data={"data": ql},
+                    timeout=self.timeout_s,
+                    headers={"User-Agent": USER_AGENT},
+                )
                 if resp.status_code in RETRY_STATUS:
                     raise httpx.HTTPStatusError(
                         f"retryable status {resp.status_code}", request=resp.request, response=resp
@@ -52,18 +66,19 @@ class OverpassClient:
                 payload = resp.json()
                 cache.write_text(json.dumps(payload))
                 return payload
-            except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+            except (httpx.TransportError, httpx.HTTPStatusError, ValueError) as exc:
                 if attempt == MAX_RETRIES - 1:
                     raise
                 logger.warning(
-                    "Overpass request failed ({}), retry {}/{} in {:.0f}s",
+                    "Overpass request to {} failed ({}), retry {}/{} in {:.0f}s",
+                    url,
                     exc,
                     attempt + 1,
                     MAX_RETRIES,
                     delay,
                 )
                 time.sleep(delay)
-                delay *= 2
+                delay = min(delay * 2, 120)
         raise RuntimeError("unreachable")
 
 
