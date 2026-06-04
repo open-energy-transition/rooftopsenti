@@ -117,15 +117,30 @@ def solar_generators(
 
 
 def buildings_in_bbox(
-    release: str, bounds: tuple[float, float, float, float]
+    release: str,
+    bounds: tuple[float, float, float, float],
+    min_area_m2: float | None = None,
 ) -> gpd.GeoDataFrame:
-    """All building footprints in a WGS84 bbox."""
+    """Building footprints in a WGS84 bbox, optionally pre-filtered by area.
+
+    The area filter runs inside DuckDB (with a 20% safety margin — the exact
+    equal-area filter happens later in the pipeline), so country-scale queries
+    transfer only large buildings instead of the full building stock.
+    ``ST_FlipCoordinates`` works around DuckDB's lat/lon axis-order assumption
+    in ``ST_Area_Spheroid``.
+    """
+    area_filter = (
+        f"AND ST_Area_Spheroid(ST_FlipCoordinates(geometry)) >= {min_area_m2 * 0.8}"
+        if min_area_m2
+        else ""
+    )
     con = connect()
     rows = con.execute(
         f"""
         SELECT id, ST_AsWKB(geometry) AS wkb
         FROM read_parquet('{theme_path(release, "buildings", "building")}', hive_partitioning=1)
         WHERE {_bbox_where()}
+          {area_filter}
         """,
         _bbox_params(bounds),
     ).fetchall()

@@ -73,7 +73,7 @@ def _scl_median_composite(
         geopolygon=aoi_geom,
         resolution=cfg.imagery.target_resolution_m,
         groupby="solar_day",
-        chunks={"x": 2048, "y": 2048},
+        chunks={"x": 1024, "y": 1024},
         dtype="uint16",
         resampling="bilinear",
     )
@@ -82,12 +82,16 @@ def _scl_median_composite(
     for cls in SCL_VALID:
         valid = valid | (scl == cls)
 
-    data = ds[[EARTH_SEARCH_ASSETS[b] for b in bands]].to_dataarray(dim="band")
-    data = data.where(valid & (data > 0))  # NaN out clouds and nodata
-    if cfg.imagery.composite_method == "mean":
-        comp = data.mean(dim="time", skipna=True)
-    else:  # median (default); medoid not supported on this backend
-        comp = data.median(dim="time", skipna=True)
+    # reduce per band (keeps peak memory per dask task at one band's time stack)
+    reduced = []
+    for b in bands:
+        da = ds[EARTH_SEARCH_ASSETS[b]]
+        da = da.where(valid & (da > 0))  # NaN out clouds and nodata
+        if cfg.imagery.composite_method == "mean":
+            reduced.append(da.mean(dim="time", skipna=True))
+        else:  # median (default); medoid not supported on this backend
+            reduced.append(da.median(dim="time", skipna=True))
+    comp = xr.concat(reduced, dim="band")
     comp = comp.fillna(NODATA).round().astype("uint16")
     comp = comp.assign_coords(band=bands)
     comp.rio.write_crs(str(ds.odc.crs), inplace=True)

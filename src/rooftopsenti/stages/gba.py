@@ -124,7 +124,9 @@ def _fetch_overture(boundary, cfg: Config) -> gpd.GeoDataFrame:
     logger.info(
         "Querying Overture buildings {} for bbox {}", cfg.overture.release, boundary.bounds
     )
-    return overture.buildings_in_bbox(cfg.overture.release, boundary.bounds)
+    return overture.buildings_in_bbox(
+        cfg.overture.release, boundary.bounds, min_area_m2=cfg.gba.building_area_min_m2
+    )
 
 
 # ------------------------------------------------------------------ stage ----
