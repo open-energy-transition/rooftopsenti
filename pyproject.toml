@@ -1,0 +1,131 @@
+[project]
+name = "rooftopsenti"
+version = "0.1.0"
+description = "Large-scale rooftop solar detection from Sentinel-2 — OSM training labels, GlobalBuildingAtlas ROIs, STAC-native pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Tobias Augspurger" }]
+dependencies = [
+    "rasterio>=1.3",
+    "geopandas>=1.0",
+    "shapely>=2.0",
+    "pyproj>=3.6",
+    "pyogrio",
+    "rioxarray",
+    "xarray",
+    "dask",
+    "mgrs",
+    "pystac>=1.10",
+    "pystac-client>=0.8",
+    "odc-stac",
+    "s2mosaic",
+    "torchgeo>=0.6",
+    "segmentation-models-pytorch",
+    "lightning",
+    "httpx",
+    "duckdb",
+    "huggingface-hub",
+    "typer",
+    "pydantic>=2",
+    "pydantic-settings",
+    "pyyaml",
+    "loguru",
+    "tqdm",
+    "folium",
+]
+
+[project.scripts]
+rooftopsenti = "rooftopsenti.cli:app"
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rooftopsenti"]
+
+# ---------------------------------------------------------------- pixi ----
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.activation.env]
+# keep ~/.local site-packages from leaking into the env
+PYTHONNOUSERSITE = "1"
+
+[tool.pixi.dependencies]
+python = "3.12.*"
+pip = "*"
+# geo stack (conda-forge resolves GDAL/PROJ far better than wheels)
+gdal = "*"
+rasterio = ">=1.3"
+geopandas = ">=1.0"
+shapely = ">=2.0"
+pyproj = ">=3.6"
+pyogrio = "*"
+rioxarray = "*"
+xarray = "*"
+dask = "*"
+mgrs = "*"
+# STAC
+pystac = ">=1.10"
+pystac-client = ">=0.8"
+odc-stac = "*"
+# ML
+pytorch = ">=2.2"
+torchvision = "*"
+torchgeo = ">=0.6"
+segmentation-models-pytorch = "*"
+lightning = "*"
+timm = "*"
+# data access / misc
+httpx = "*"
+python-duckdb = "*"
+huggingface_hub = "*"
+typer = "*"
+pydantic = ">=2"
+pydantic-settings = "*"
+pyyaml = "*"
+loguru = "*"
+tqdm = "*"
+folium = "*"
+# dev
+pytest = "*"
+ruff = "*"
+
+[tool.pixi.pypi-dependencies]
+rooftopsenti = { path = ".", editable = true }
+s2mosaic = "*"
+omnicloudmask = "*"
+
+# Opt-in CUDA environment: `pixi run -e cuda ...` on a machine with NVIDIA driver
+[tool.pixi.feature.cuda.system-requirements]
+cuda = "12"
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+cuda = { features = ["cuda"], solve-group = "default" }
+
+[tool.pixi.tasks]
+test = "pytest -q"
+lint = "ruff check src tests"
+fmt = "ruff format src tests"
+smoke = "rooftopsenti run-all -c configs/smoke_nl_tile.yaml"
+
+# ---------------------------------------------------------------- tools ---
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

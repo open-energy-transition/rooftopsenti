@@ -1,0 +1,57 @@
+# Pilot region: Netherlands (well-mapped OSM rooftop solar — used for training + inference)
+region: netherlands
+
+aoi:
+  source: geoboundaries      # geoboundaries | overpass_admin | bbox
+  iso3: NLD
+  admin_level: 0             # 0 = country, 1 = state/province
+  admin_name: null           # set together with admin_level: 1 for a single province
+
+osm:
+  overpass_url: https://overpass-api.de/api/interpreter
+  solar_area_min_m2: 1000    # ~10 Sentinel-2 pixels
+  rooftop_rule: intersect_or_roof_tag   # roof tag OR intersects a building polygon
+  chunk_deg: 0.5             # bbox grid size for chunked Overpass queries
+  timeout_s: 300
+
+imagery:
+  stac_url: https://earth-search.aws.element84.com/v1
+  collection: sentinel-2-l2a
+  date_ranges:
+    - ["2023-04-01", "2023-09-30"]
+  bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
+  composite_method: median   # median | medoid (via S2Mosaic)
+  cloud_mask: scl            # scl | omnicloudmask (OCM is better but needs GPU to be fast)
+  target_resolution_m: 10
+  tiles: null                # optional MGRS whitelist; null = all tiles intersecting AOI
+
+gba:
+  source: huggingface        # huggingface | overture
+  hf_repo: zhu-xlab/GBA.LoD1
+  building_area_min_m2: 1000
+
+model:
+  arch: unet
+  encoder: resnet18
+  pretrained: ssl4eo_s2_moco # SSL4EO-S12 Sentinel-2 MoCo weights via torchgeo
+  num_classes: 2
+  loss: focal_dice
+  lr: 1.0e-4
+  batch_size: 32
+  patch_size: 256
+  max_epochs: 60
+  device: auto
+
+chips:
+  pos_per_label: 4           # jittered patches per positive polygon
+  neg_ratio: 5               # hard-negative : positive patch ratio
+
+postprocess:
+  prob_threshold: 0.5
+  building_coverage_min: 0.10  # predicted-solar fraction of footprint => has_solar
+  min_solar_area_m2: 1000
+
+split:
+  block_size_km: 25
+  ratios: { train: 0.70, val: 0.15, test: 0.15 }
+  seed: 42

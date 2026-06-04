@@ -1,0 +1,18 @@
+# environments
+.pixi/
+.venv/
+__pycache__/
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+
+# data & artifacts (cached pipeline outputs, can be huge)
+data/
+artifacts/
+lightning_logs/
+*.tif
+*.ckpt
+
+# notebooks / scratch
+*.ipynb_checkpoints
+scratch/
