@@ -25,8 +25,7 @@ imagery:
   tiles: null
 
 gba:
-  source: huggingface
-  hf_repo: zhu-xlab/GBA.LoD1
+  source: overture            # smoke: bbox-queryable, avoids multi-GB GBA tile download
   building_area_min_m2: 1000
 
 model:

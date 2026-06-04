@@ -1,0 +1,90 @@
+{
+  "version": 0.6,
+  "elements": [
+    {
+      "type": "way",
+      "id": 1001,
+      "tags": {
+        "power": "generator",
+        "generator:source": "solar",
+        "generator:method": "photovoltaic",
+        "location": "roof"
+      },
+      "geometry": [
+        { "lat": 51.40, "lon": 6.15 },
+        { "lat": 51.40, "lon": 6.151 },
+        { "lat": 51.401, "lon": 6.151 },
+        { "lat": 51.401, "lon": 6.15 },
+        { "lat": 51.40, "lon": 6.15 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 1002,
+      "tags": { "power": "generator", "generator:source": "solar" },
+      "geometry": [
+        { "lat": 51.42, "lon": 6.17 },
+        { "lat": 51.42, "lon": 6.171 },
+        { "lat": 51.421, "lon": 6.171 }
+      ]
+    },
+    {
+      "type": "node",
+      "id": 1003,
+      "lat": 51.43,
+      "lon": 6.18,
+      "tags": { "power": "generator", "generator:source": "solar" }
+    },
+    {
+      "type": "relation",
+      "id": 2001,
+      "tags": {
+        "type": "multipolygon",
+        "power": "generator",
+        "generator:source": "solar"
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 3001,
+          "role": "outer",
+          "geometry": [
+            { "lat": 51.45, "lon": 6.20 },
+            { "lat": 51.45, "lon": 6.202 },
+            { "lat": 51.452, "lon": 6.202 },
+            { "lat": 51.452, "lon": 6.20 },
+            { "lat": 51.45, "lon": 6.20 }
+          ]
+        },
+        {
+          "type": "way",
+          "ref": 3002,
+          "role": "inner",
+          "geometry": [
+            { "lat": 51.4505, "lon": 6.2005 },
+            { "lat": 51.4505, "lon": 6.2010 },
+            { "lat": 51.4510, "lon": 6.2010 },
+            { "lat": 51.4510, "lon": 6.2005 },
+            { "lat": 51.4505, "lon": 6.2005 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 1001,
+      "tags": {
+        "power": "generator",
+        "generator:source": "solar",
+        "location": "roof"
+      },
+      "geometry": [
+        { "lat": 51.40, "lon": 6.15 },
+        { "lat": 51.40, "lon": 6.151 },
+        { "lat": 51.401, "lon": 6.151 },
+        { "lat": 51.401, "lon": 6.15 },
+        { "lat": 51.40, "lon": 6.15 }
+      ]
+    }
+  ]
+}

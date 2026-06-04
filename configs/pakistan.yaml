@@ -27,8 +27,7 @@ imagery:
   tiles: null
 
 gba:
-  source: huggingface
-  hf_repo: zhu-xlab/GBA.LoD1
+  source: huggingface        # huggingface (GlobalBuildingAtlas) | overture
   building_area_min_m2: 1000
 
 model:

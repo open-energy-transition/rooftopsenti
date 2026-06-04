@@ -69,7 +69,10 @@ class ImageryConfig(BaseModel):
 
 class GBAConfig(BaseModel):
     source: Literal["huggingface", "overture"] = "huggingface"
-    hf_repo: str = "zhu-xlab/GBA.LoD1"
+    # GBA footprints are split across two HF repos (ODbL bulk + non-ODbL extras)
+    hf_repo_odbl: str = "zhu-xlab/GBA.ODbLPolygon"
+    hf_repo_extra: str = "zhu-xlab/GBA.LoD1"
+    overture_release: str = "2026-05-20.0"
     building_area_min_m2: float = 1000.0
 
 
