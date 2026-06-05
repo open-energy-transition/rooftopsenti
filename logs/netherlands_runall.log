@@ -30,3 +30,254 @@
 2026-06-04 23:39:23.641 | INFO     | rooftopsenti.stages.composite:run:171 - 31UES range 0: computing median composite ...
 /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-packages/rasterio/warp.py:385: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
   dest = _reproject(
+2026-06-05 04:39:28.631 | INFO     | rooftopsenti.cli:_setup:26 - Region: netherlands (run id 39abe6034f)
+2026-06-05 04:39:28.632 | INFO     | rooftopsenti.stages.aoi:run:61 - AOI artifacts fresh — skipping
+2026-06-05 04:39:28.633 | INFO     | rooftopsenti.stages.osm_labels:run:141 - OSM labels fresh — skipping
+2026-06-05 04:39:32.386 | INFO     | rooftopsenti.stages.composite:_search_items:64 - 31UES: 39 STAC items in 2023-04-01..2023-09-30
+2026-06-05 04:39:49.674 | INFO     | rooftopsenti.stages.composite:run:174 - 31UES range 0: computing median composite ...
+/home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-packages/rasterio/warp.py:385: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
+  dest = _reproject(
+Aborting load due to failure while reading: https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/31/U/ES/2023/5/S2B_31UES_20230520_0_L2A/B11.tif:1
+Aborting load due to failure while reading: https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/31/U/ES/2023/5/S2B_31UES_20230520_0_L2A/B11.tif:1
+CPLE_AppDefinedError: TIFFFillTile:Read error at row 4294967295, col 4294967295,
+tile 1; got 1477372 bytes, expected 1499626
+
+The above exception was the direct cause of the following exception:
+
+CPLE_AppDefinedError: TIFFReadEncodedTile() failed.
+
+The above exception was the direct cause of the following exception:
+
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ in rasterio._warp._reproject:646                                             │
+│                                                                              │
+│ in rasterio._warp._reproject:646                                             │
+│                                                                              │
+│ in rasterio._warp._reproject:654                                             │
+│                                                                              │
+│ in rasterio._err.StackChecker.exc_wrap_int:325                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+CPLE_AppDefinedError: B11.tif, band 1: IReadBlock failed at X offset 1, Y offset
+0: TIFFReadEncodedTile() failed.
+
+The above exception was the direct cause of the following exception:
+
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /home/ly0/gitclones/rooftopsenti/src/rooftopsenti/cli.py:171 in run_all      │
+│                                                                              │
+│   168 │   cfg, store = _setup(config)                                        │
+│   169 │   s_aoi.run(cfg, store)                                              │
+│   170 │   s_labels.run(cfg, store)                                           │
+│ ❱ 171 │   s_composite.run(cfg, store)                                        │
+│   172 │   s_gba.run(cfg, store)                                              │
+│   173 │   s_chips.run(cfg, store)                                            │
+│   174 │   rid = s_train.run(cfg, store, run_id=run_id)                       │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/src/rooftopsenti/stages/composite.py:175 in │
+│ run                                                                          │
+│                                                                              │
+│   172 │   │   │   │   │   continue                                           │
+│   173 │   │   │   │   comp = _scl_median_composite(items, cfg.imagery.bands, │
+│       boundary, cfg)                                                         │
+│   174 │   │   │   │   logger.info("{} range {}: computing median composite   │
+│       ...", tile, range_idx)                                                 │
+│ ❱ 175 │   │   │   │   comp = comp.compute()                                  │
+│   176 │   │   │   │   if int((np.asarray(comp.values) != NODATA).sum()) ==   │
+│       0:                                                                     │
+│   177 │   │   │   │   │   logger.warning("{} range {}: composite empty —     │
+│       skipping", tile, range_idx)                                            │
+│   178 │   │   │   │   │   continue                                           │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/xarray/core/dataarray.py:1247 in compute                                │
+│                                                                              │
+│   1244 │   │   Variable.compute                                              │
+│   1245 │   │   """                                                           │
+│   1246 │   │   new = self.copy(deep=False)                                   │
+│ ❱ 1247 │   │   return new.load(**kwargs)                                     │
+│   1248 │                                                                     │
+│   1249 │   def persist(self, **kwargs) -> Self:                              │
+│   1250 │   │   """Trigger computation in constituent dask arrays             │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/xarray/core/dataarray.py:1173 in load                                   │
+│                                                                              │
+│   1170 │   │   Dataset.load                                                  │
+│   1171 │   │   Variable.load                                                 │
+│   1172 │   │   """                                                           │
+│ ❱ 1173 │   │   ds = self._to_temp_dataset().load(**kwargs)                   │
+│   1174 │   │   new = self._from_temp_dataset(ds)                             │
+│   1175 │   │   self._variable = new._variable                                │
+│   1176 │   │   self._coords = new._coords                                    │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/xarray/core/dataset.py:569 in load                                      │
+│                                                                              │
+│     566 │   │   │   chunkmanager =                                           │
+│         get_chunked_array_type(*chunked_data.values())                       │
+│     567 │   │   │                                                            │
+│     568 │   │   │   # evaluate all the chunked arrays simultaneously         │
+│ ❱   569 │   │   │   evaluated_data: tuple[np.ndarray[Any, Any], ...] =       │
+│         chunkmanager.compute(                                                │
+│     570 │   │   │   │   *chunked_data.values(), **kwargs                     │
+│     571 │   │   │   )                                                        │
+│     572                                                                      │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/xarray/namedarray/daskmanager.py:85 in compute                          │
+│                                                                              │
+│    82 │   ) -> tuple[np.ndarray[Any, _DType_co], ...]:                       │
+│    83 │   │   from dask.array import compute                                 │
+│    84 │   │                                                                  │
+│ ❱  85 │   │   return compute(*data, **kwargs)  # type:                       │
+│       ignore[no-untyped-call, no-any-return]                                 │
+│    86 │                                                                      │
+│    87 │   def persist(self, *data: Any, **kwargs: Any) -> tuple[DaskArray |  │
+│       Any, ...]:                                                             │
+│    88 │   │   from dask import persist                                       │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/dask/base.py:685 in compute                                             │
+│                                                                              │
+│    682 │   │   expr = expr.optimize()                                        │
+│    683 │   │   keys = list(flatten(expr.__dask_keys__()))                    │
+│    684 │   │                                                                 │
+│ ❱  685 │   │   results = schedule(expr, keys, **kwargs)                      │
+│    686 │                                                                     │
+│    687 │   return repack(results)                                            │
+│    688                                                                       │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/odc/loader/_builder.py:498 in _dask_loader_tyx                          │
+│                                                                              │
+│    495 │   ydim = len(prefix_dims)                                           │
+│    496 │   with rdr.restore_env(env, load_state):                            │
+│    497 │   │   for ti, ti_srcs in enumerate(srcs):                           │
+│ ❱  498 │   │   │   _fill_nd_slice(                                           │
+│    499 │   │   │   │   ti_srcs, gbox, cfg, chunk[ti], ydim=ydim,             │
+│        selection=selection                                                   │
+│    500 │   │   │   )                                                         │
+│    501 │   │   return chunk                                                  │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/odc/loader/_builder.py:583 in _fill_nd_slice                            │
+│                                                                              │
+│    580 │                                                                     │
+│    581 │   fuser = resolve_fuser(cfg.fuser_fqn) if cfg.fuser_fqn is not None │
+│        else None                                                             │
+│    582 │                                                                     │
+│ ❱  583 │   return fuse_nd_slices(                                            │
+│    584 │   │   (src.read(cfg, dst_gbox, selection=selection) for src in      │
+│        srcs),                                                                │
+│    585 │   │   fill_value,                                                   │
+│    586 │   │   dst,                                                          │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/odc/loader/_builder.py:549 in fuse_nd_slices                            │
+│                                                                              │
+│    546 │   if fuser is None:                                                 │
+│    547 │   │   fuser = fuser_for_nodata(fill_value)                          │
+│    548 │                                                                     │
+│ ❱  549 │   for yx_roi, pix in srcs:                                          │
+│    550 │   │   assert len(yx_roi) == 2                                       │
+│    551 │   │   assert pix.ndim == dst.ndim                                   │
+│    552 │   │   _roi: tuple[slice, ...] = prefix_roi + yx_roi + postfix_roi   │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/odc/loader/_builder.py:584 in <genexpr>                                 │
+│                                                                              │
+│    581 │   fuser = resolve_fuser(cfg.fuser_fqn) if cfg.fuser_fqn is not None │
+│        else None                                                             │
+│    582 │                                                                     │
+│    583 │   return fuse_nd_slices(                                            │
+│ ❱  584 │   │   (src.read(cfg, dst_gbox, selection=selection) for src in      │
+│        srcs),                                                                │
+│    585 │   │   fill_value,                                                   │
+│    586 │   │   dst,                                                          │
+│    587 │   │   ydim=ydim,                                                    │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/odc/loader/_rio.py:140 in read                                          │
+│                                                                              │
+│   137 │   │   dst: Optional[np.ndarray] = None,                              │
+│   138 │   │   selection: Optional[ReaderSubsetSelection] = None,             │
+│   139 │   ) -> tuple[tuple[slice, slice], np.ndarray]:                       │
+│ ❱ 140 │   │   return rio_read(self._src, cfg, dst_geobox, dst=dst,           │
+│       selection=selection)                                                   │
+│   141                                                                        │
+│   142                                                                        │
+│   143 class RioDriver:                                                       │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/odc/loader/_rio.py:567 in rio_read                                      │
+│                                                                              │
+│   564 │   │   │   │   src.uri,                                               │
+│   565 │   │   │   │   src.band,                                              │
+│   566 │   │   │   )                                                          │
+│ ❱ 567 │   │   │   raise e                                                    │
+│   568 │   except rasterio.errors.RasterioError as e:                         │
+│   569 │   │   if cfg.fail_on_error:                                          │
+│   570 │   │   │   log.error(                                                 │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/odc/loader/_rio.py:553 in rio_read                                      │
+│                                                                              │
+│   550 │                                                                      │
+│   551 │   try:                                                               │
+│   552 │   │   return fixup_out(                                              │
+│ ❱ 553 │   │   │   _rio_read(src, cfg, dst_geobox, prep_dst(dst),             │
+│       selection=selection)                                                   │
+│   554 │   │   )                                                              │
+│   555 │   except (                                                           │
+│   556 │   │   rasterio.errors.RasterioIOError,                               │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/odc/loader/_rio.py:614 in _rio_read                                     │
+│                                                                              │
+│   611 │   │                                                                  │
+│   612 │   │   if ovr_idx is None:                                            │
+│   613 │   │   │   with rio_env(VSI_CACHE=False):                             │
+│ ❱ 614 │   │   │   │   return _do_read(rasterio.band(rdr, bidx), cfg,         │
+│       dst_geobox, rr, dst=dst)                                               │
+│   615 │   │                                                                  │
+│   616 │   │   # read from overview                                           │
+│   617 │   │   with rasterio.open(                                            │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/odc/loader/_rio.py:481 in _do_read                                      │
+│                                                                              │
+│   478 │   │   # TODO: support read with integer shrink then reproject more   │
+│   479 │   │   # TODO: deal with int8 inputs                                  │
+│   480 │   │                                                                  │
+│ ❱ 481 │   │   rasterio.warp.reproject(                                       │
+│   482 │   │   │   src,                                                       │
+│   483 │   │   │   _dst,                                                      │
+│   484 │   │   │   src_nodata=src_nodata,                                     │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/rasterio/env.py:411 in wrapper                                          │
+│                                                                              │
+│   408 │   @wraps(f)                                                          │
+│   409 │   def wrapper(*args, **kwds):                                        │
+│   410 │   │   if local._env:                                                 │
+│ ❱ 411 │   │   │   return f(*args, **kwds)                                    │
+│   412 │   │   else:                                                          │
+│   413 │   │   │   with Env.from_defaults():                                  │
+│   414 │   │   │   │   return f(*args, **kwds)                                │
+│                                                                              │
+│ /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-pack │
+│ ages/rasterio/warp.py:385 in reproject                                       │
+│                                                                              │
+│   382 │   │   │   if masked:                                                 │
+│   383 │   │   │   │   destination = np.ma.masked_array(destination)          │
+│   384 │                                                                      │
+│ ❱ 385 │   dest = _reproject(                                                 │
+│   386 │   │   source,                                                        │
+│   387 │   │   destination,                                                   │
+│   388 │   │   src_transform=src_transform,                                   │
+│                                                                              │
+│ in rasterio._warp._reproject:389                                             │
+│                                                                              │
+│ in rasterio._warp._reproject:657                                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+WarpOperationError: Chunk and warp failed

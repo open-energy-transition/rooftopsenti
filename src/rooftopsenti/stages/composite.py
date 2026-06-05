@@ -79,6 +79,9 @@ def _scl_median_composite(
         chunks={"x": 1024, "y": 1024},
         dtype="uint16",
         resampling="bilinear",
+        # transient S3 read failures become nodata for that scene/chunk instead
+        # of killing the whole composite — the temporal median covers the gap
+        fail_on_error=False,
     )
     scl = ds[EARTH_SEARCH_ASSETS["SCL"]]
     valid = xr.zeros_like(scl, dtype=bool)
@@ -150,42 +153,64 @@ def run(cfg: Config, store: ArtifactStore, only_tiles: list[str] | None = None) 
 
         dask.config.set(scheduler="threads", num_workers=int(n_threads))
 
+    # harden remote COG reads against transient S3/HTTP hiccups
+    os.environ.setdefault("GDAL_HTTP_MAX_RETRY", "5")
+    os.environ.setdefault("GDAL_HTTP_RETRY_DELAY", "2")
+
     cfg_slice = cfg.imagery.model_dump(mode="json")
     boundary = aoi.load_boundary(store)
     tiles = aoi.load_tiles(store)
     if only_tiles:
         tiles = [t for t in tiles if t in set(only_tiles)]
 
+    failures: list[str] = []
     for tile in tiles:
         for range_idx, date_range in enumerate(cfg.imagery.date_ranges):
             out_path = store.composite_tif(tile, range_idx)
             if store.is_fresh(out_path, cfg_slice):
                 logger.info("{} range {}: fresh — skipping", tile, range_idx)
                 continue
+            try:
+                _composite_one(cfg, store, boundary, tile, range_idx, date_range, cfg_slice)
+            except Exception:
+                logger.exception(
+                    "{} range {}: composite FAILED — continuing with next tile "
+                    "(re-run `composite` to retry)",
+                    tile,
+                    range_idx,
+                )
+                failures.append(f"{tile}_r{range_idx}")
+    if failures:
+        raise RuntimeError(f"composites failed for: {failures} — re-run `composite` to retry")
 
-            if cfg.imagery.cloud_mask == "omnicloudmask":
-                _composite_s2mosaic(tile, tuple(date_range), cfg, out_path)
-            else:
-                items = _search_items(tile, tuple(date_range), cfg)
-                if not items:
-                    logger.warning("{} range {}: no items found — skipping", tile, range_idx)
-                    continue
-                comp = _scl_median_composite(items, cfg.imagery.bands, boundary, cfg)
-                logger.info("{} range {}: computing median composite ...", tile, range_idx)
-                comp = comp.compute()
-                if int((np.asarray(comp.values) != NODATA).sum()) == 0:
-                    logger.warning("{} range {}: composite empty — skipping", tile, range_idx)
-                    continue
-                _write_cog(comp, out_path)
 
-            register_composite(
-                store.stac_catalog,
-                cfg.region,
-                tile,
-                range_idx,
-                out_path,
-                tuple(date_range),
-                cfg.imagery.bands,
-            )
-            store.write_meta(out_path, cfg_slice)
-            logger.info("{} range {}: composite written -> {}", tile, range_idx, out_path)
+def _composite_one(
+    cfg: Config, store: ArtifactStore, boundary, tile: str, range_idx: int, date_range, cfg_slice
+) -> None:
+    out_path = store.composite_tif(tile, range_idx)
+    if cfg.imagery.cloud_mask == "omnicloudmask":
+        _composite_s2mosaic(tile, tuple(date_range), cfg, out_path)
+    else:
+        items = _search_items(tile, tuple(date_range), cfg)
+        if not items:
+            logger.warning("{} range {}: no items found — skipping", tile, range_idx)
+            return
+        comp = _scl_median_composite(items, cfg.imagery.bands, boundary, cfg)
+        logger.info("{} range {}: computing median composite ...", tile, range_idx)
+        comp = comp.compute()
+        if int((np.asarray(comp.values) != NODATA).sum()) == 0:
+            logger.warning("{} range {}: composite empty — skipping", tile, range_idx)
+            return
+        _write_cog(comp, out_path)
+
+    register_composite(
+        store.stac_catalog,
+        cfg.region,
+        tile,
+        range_idx,
+        out_path,
+        tuple(date_range),
+        cfg.imagery.bands,
+    )
+    store.write_meta(out_path, cfg_slice)
+    logger.info("{} range {}: composite written -> {}", tile, range_idx, out_path)
