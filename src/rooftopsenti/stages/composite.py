@@ -55,7 +55,10 @@ def _search_items(tile: str, date_range: tuple[str, str], cfg: Config):
     search = catalog.search(
         collections=[cfg.imagery.collection],
         datetime=f"{date_range[0]}/{date_range[1]}",
-        query={"grid:code": {"eq": f"MGRS-{tile}"}},
+        query={
+            "grid:code": {"eq": f"MGRS-{tile}"},
+            "eo:cloud_cover": {"lt": cfg.imagery.max_cloud_pct},
+        },
     )
     items = list(search.items())
     logger.info("{}: {} STAC items in {}..{}", tile, len(items), *date_range)

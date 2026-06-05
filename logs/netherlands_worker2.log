@@ -1,0 +1,3 @@
+2026-06-04 23:38:38.057 | INFO     | rooftopsenti.cli:_setup:26 - Region: netherlands (run id 80f487dcb1)
+2026-06-04 23:38:43.771 | INFO     | rooftopsenti.stages.composite:_search_items:61 - 31UGU: 96 STAC items in 2023-04-01..2023-09-30
+2026-06-04 23:39:16.367 | INFO     | rooftopsenti.stages.composite:run:171 - 31UGU range 0: computing median composite ...

@@ -23,3 +23,10 @@
 2026-06-04 23:35:24.807 | INFO     | rooftopsenti.stages.osm_labels:run:141 - OSM labels fresh — skipping
 2026-06-04 23:35:32.809 | INFO     | rooftopsenti.stages.composite:_search_items:61 - 31UES: 104 STAC items in 2023-04-01..2023-09-30
 2026-06-04 23:36:03.615 | INFO     | rooftopsenti.stages.composite:run:162 - 31UES range 0: computing median composite ...
+2026-06-04 23:38:40.487 | INFO     | rooftopsenti.cli:_setup:26 - Region: netherlands (run id 80f487dcb1)
+2026-06-04 23:38:40.487 | INFO     | rooftopsenti.stages.aoi:run:61 - AOI artifacts fresh — skipping
+2026-06-04 23:38:40.488 | INFO     | rooftopsenti.stages.osm_labels:run:141 - OSM labels fresh — skipping
+2026-06-04 23:38:47.135 | INFO     | rooftopsenti.stages.composite:_search_items:61 - 31UES: 104 STAC items in 2023-04-01..2023-09-30
+2026-06-04 23:39:23.641 | INFO     | rooftopsenti.stages.composite:run:171 - 31UES range 0: computing median composite ...
+/home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-packages/rasterio/warp.py:385: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
+  dest = _reproject(
