@@ -89,8 +89,26 @@ def _search_items(tile: str, date_range: tuple[str, str], cfg: Config):
         },
     )
     items = list(search.items())
-    logger.info("{}: {} STAC items in {}..{}", tile, len(items), *date_range)
-    return items
+
+    # one item per solar day (PC keeps reprocessing duplicates), then keep only
+    # the N clearest scenes — every extra scene costs real download time
+    by_day: dict[str, object] = {}
+    for item in items:
+        day = item.datetime.date().isoformat()
+        prev = by_day.get(day)
+        if prev is None or item.properties["eo:cloud_cover"] < prev.properties["eo:cloud_cover"]:
+            by_day[day] = item
+    deduped = sorted(by_day.values(), key=lambda i: i.properties["eo:cloud_cover"])
+    kept = sorted(deduped[: cfg.imagery.max_scenes], key=lambda i: i.datetime)
+    logger.info(
+        "{}: {} STAC items in {}..{} -> {} after dedup, keeping {} clearest",
+        tile,
+        len(items),
+        *date_range,
+        len(deduped),
+        len(kept),
+    )
+    return kept
 
 
 def _scl_median_composite(

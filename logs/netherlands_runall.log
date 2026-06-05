@@ -295,3 +295,12 @@ WarpOperationError: Chunk and warp failed
 2026-06-05 07:27:40.598 | INFO     | rooftopsenti.stages.composite:_composite_one:199 - 31UES range 0: computing median composite ...
 /home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-packages/rasterio/warp.py:385: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
   dest = _reproject(
+2026-06-05 09:49:26.572 | INFO     | rooftopsenti.cli:_setup:26 - Region: netherlands (run id 2cb901428b)
+2026-06-05 09:49:26.575 | INFO     | rooftopsenti.stages.aoi:run:61 - AOI artifacts fresh — skipping
+2026-06-05 09:49:26.576 | INFO     | rooftopsenti.stages.osm_labels:run:141 - OSM labels fresh — skipping
+2026-06-05 09:49:28.306 | INFO     | rooftopsenti.stages.composite:_search_items:92 - 31UES: 77 STAC items in 2023-04-01..2023-09-30
+2026-06-05 09:49:58.438 | INFO     | rooftopsenti.stages.composite:_composite_one:231 - 31UES range 0: computing median composite ...
+/home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-packages/rasterio/warp.py:385: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
+  dest = _reproject(
+/home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-packages/rasterio/warp.py:385: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
+  dest = _reproject(

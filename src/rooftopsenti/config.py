@@ -60,6 +60,7 @@ class ImageryConfig(BaseModel):
     composite_method: Literal["median", "medoid", "mean"] = "median"
     cloud_mask: Literal["scl", "omnicloudmask"] = "scl"
     max_cloud_pct: float = 60.0  # skip scenes cloudier than this in the STAC search
+    max_scenes: int = 15  # clearest scenes kept per tile/range (bandwidth is the bottleneck)
     target_resolution_m: float = 10.0
     tiles: list[str] | None = None  # optional MGRS whitelist
 
