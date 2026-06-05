@@ -281,3 +281,17 @@ The above exception was the direct cause of the following exception:
 │ in rasterio._warp._reproject:657                                             │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 WarpOperationError: Chunk and warp failed
+2026-06-05 05:05:37.491 | INFO     | rooftopsenti.cli:_setup:26 - Region: netherlands (run id 39abe6034f)
+2026-06-05 05:05:37.492 | INFO     | rooftopsenti.stages.aoi:run:61 - AOI artifacts fresh — skipping
+2026-06-05 05:05:37.492 | INFO     | rooftopsenti.stages.osm_labels:run:141 - OSM labels fresh — skipping
+2026-06-05 05:05:41.270 | INFO     | rooftopsenti.stages.composite:_search_items:64 - 31UES: 39 STAC items in 2023-04-01..2023-09-30
+2026-06-05 05:05:58.116 | INFO     | rooftopsenti.stages.composite:_composite_one:199 - 31UES range 0: computing median composite ...
+/home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-packages/rasterio/warp.py:385: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
+  dest = _reproject(
+2026-06-05 07:27:19.347 | INFO     | rooftopsenti.cli:_setup:26 - Region: netherlands (run id 39abe6034f)
+2026-06-05 07:27:19.349 | INFO     | rooftopsenti.stages.aoi:run:61 - AOI artifacts fresh — skipping
+2026-06-05 07:27:19.350 | INFO     | rooftopsenti.stages.osm_labels:run:141 - OSM labels fresh — skipping
+2026-06-05 07:27:23.520 | INFO     | rooftopsenti.stages.composite:_search_items:64 - 31UES: 39 STAC items in 2023-04-01..2023-09-30
+2026-06-05 07:27:40.598 | INFO     | rooftopsenti.stages.composite:_composite_one:199 - 31UES range 0: computing median composite ...
+/home/ly0/gitclones/rooftopsenti/.pixi/envs/default/lib/python3.12/site-packages/rasterio/warp.py:385: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
+  dest = _reproject(

@@ -20,7 +20,7 @@ osm:
   timeout_s: 300
 
 imagery:
-  stac_url: https://earth-search.aws.element84.com/v1
+  stac_source: planetary_computer   # EU-hosted data; earth_search for AWS us-west-2
   collection: sentinel-2-l2a
   date_ranges:
     - ["2023-12-01", "2024-04-30"]   # dry season — fewer clouds

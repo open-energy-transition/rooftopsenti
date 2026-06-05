@@ -1,12 +1,17 @@
 """Stage c) Cloud-free Sentinel-2 composites per MGRS tile via STAC.
 
-Primary backend (``cloud_mask: scl``): query Element84 Earth Search with
-pystac-client, lazily load with odc-stac, mask clouds with the L2A Scene
-Classification Layer, and reduce with a temporal median. Runs anywhere, no GPU.
+Primary backend (``cloud_mask: scl``): query a STAC catalog with pystac-client,
+lazily load with odc-stac, mask clouds with the L2A Scene Classification Layer,
+and reduce with a temporal median. Runs anywhere, no GPU.
 
-Optional backend (``cloud_mask: omnicloudmask``): delegate to S2Mosaic, which
-uses the OmniCloudMask deep-learning mask (better, GPU-friendly) but queries
-Microsoft Planetary Computer instead of Earth Search.
+Two STAC sources (``imagery.stac_source``):
+- ``earth_search`` — Element84, free, no auth; data in AWS us-west-2 (fast from
+  the Americas, transatlantic-slow from Europe).
+- ``planetary_computer`` — Microsoft, free, anonymous SAS URL signing; data in
+  Azure West Europe (fast from Europe).
+
+Optional backend (``cloud_mask: omnicloudmask``): delegate to S2Mosaic
+(OmniCloudMask deep-learning mask; always queries Planetary Computer).
 
 Every composite is written as a COG and registered in a local STAC catalog.
 """
@@ -43,6 +48,28 @@ EARTH_SEARCH_ASSETS = {
     "SCL": "scl",
 }
 
+# Planetary Computer uses the plain band ids as asset keys
+PC_ASSETS = {b: b for b in EARTH_SEARCH_ASSETS}
+
+
+def _source_spec(cfg: Config) -> dict:
+    """Per-source STAC details: asset names, tile query, URL signing."""
+    if cfg.imagery.stac_source == "planetary_computer":
+        import planetary_computer as pc
+
+        return {
+            "assets": PC_ASSETS,
+            "tile_query": lambda tile: {"s2:mgrs_tile": {"eq": tile}},
+            "modifier": pc.sign_inplace,
+            "patch_url": pc.sign,
+        }
+    return {
+        "assets": EARTH_SEARCH_ASSETS,
+        "tile_query": lambda tile: {"grid:code": {"eq": f"MGRS-{tile}"}},
+        "modifier": None,
+        "patch_url": None,
+    }
+
 # SCL classes to KEEP: 4 vegetation, 5 not-vegetated, 6 water, 7 unclassified.
 # Masked: nodata/saturated/dark (0-2), cloud shadow (3), clouds (8-10), snow (11).
 SCL_VALID = (4, 5, 6, 7)
@@ -51,12 +78,13 @@ NODATA = 0
 
 
 def _search_items(tile: str, date_range: tuple[str, str], cfg: Config):
-    catalog = pystac_client.Client.open(cfg.imagery.stac_url)
+    spec = _source_spec(cfg)
+    catalog = pystac_client.Client.open(cfg.imagery.stac_url, modifier=spec["modifier"])
     search = catalog.search(
         collections=[cfg.imagery.collection],
         datetime=f"{date_range[0]}/{date_range[1]}",
         query={
-            "grid:code": {"eq": f"MGRS-{tile}"},
+            **spec["tile_query"](tile),
             "eo:cloud_cover": {"lt": cfg.imagery.max_cloud_pct},
         },
     )
@@ -69,7 +97,9 @@ def _scl_median_composite(
     items, bands: list[str], aoi_geom, cfg: Config
 ) -> xr.DataArray | None:
     """Lazy-load items with odc-stac, SCL-mask, temporal median -> (band, y, x)."""
-    assets = [EARTH_SEARCH_ASSETS[b] for b in bands] + [EARTH_SEARCH_ASSETS["SCL"]]
+    spec = _source_spec(cfg)
+    asset_of = spec["assets"]
+    assets = [asset_of[b] for b in bands] + [asset_of["SCL"]]
     ds = odc.stac.load(
         items,
         bands=assets,
@@ -79,11 +109,13 @@ def _scl_median_composite(
         chunks={"x": 1024, "y": 1024},
         dtype="uint16",
         resampling="bilinear",
+        # re-sign asset URLs at read time (Planetary Computer SAS tokens expire)
+        patch_url=spec["patch_url"],
         # transient S3 read failures become nodata for that scene/chunk instead
         # of killing the whole composite — the temporal median covers the gap
         fail_on_error=False,
     )
-    scl = ds[EARTH_SEARCH_ASSETS["SCL"]]
+    scl = ds[asset_of["SCL"]]
     valid = xr.zeros_like(scl, dtype=bool)
     for cls in SCL_VALID:
         valid = valid | (scl == cls)
@@ -91,7 +123,7 @@ def _scl_median_composite(
     # reduce per band (keeps peak memory per dask task at one band's time stack)
     reduced = []
     for b in bands:
-        da = ds[EARTH_SEARCH_ASSETS[b]]
+        da = ds[asset_of[b]]
         da = da.where(valid & (da > 0))  # NaN out clouds and nodata
         if cfg.imagery.composite_method == "mean":
             reduced.append(da.mean(dim="time", skipna=True))

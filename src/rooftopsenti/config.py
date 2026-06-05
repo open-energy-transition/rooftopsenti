@@ -50,7 +50,8 @@ class OSMConfig(BaseModel):
 
 
 class ImageryConfig(BaseModel):
-    stac_url: str = "https://earth-search.aws.element84.com/v1"
+    stac_source: Literal["earth_search", "planetary_computer"] = "earth_search"
+    stac_url: str | None = None  # defaults per stac_source when omitted
     collection: str = "sentinel-2-l2a"
     date_ranges: list[DateRange]
     bands: list[str] = Field(
@@ -61,6 +62,15 @@ class ImageryConfig(BaseModel):
     max_cloud_pct: float = 60.0  # skip scenes cloudier than this in the STAC search
     target_resolution_m: float = 10.0
     tiles: list[str] | None = None  # optional MGRS whitelist
+
+    @model_validator(mode="after")
+    def _default_stac_url(self) -> ImageryConfig:
+        if self.stac_url is None:
+            self.stac_url = {
+                "earth_search": "https://earth-search.aws.element84.com/v1",
+                "planetary_computer": "https://planetarycomputer.microsoft.com/api/stac/v1",
+            }[self.stac_source]
+        return self
 
     @field_validator("date_ranges")
     @classmethod

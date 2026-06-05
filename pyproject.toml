@@ -97,6 +97,7 @@ folium = "*"
 # dev
 pytest = "*"
 ruff = "*"
+planetary-computer = ">=1.0.0,<2"
 
 [tool.pixi.pypi-dependencies]
 rooftopsenti = { path = ".", editable = true }
