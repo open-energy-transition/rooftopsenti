@@ -128,6 +128,10 @@ def run(cfg: Config, store: ArtifactStore) -> None:
         "chips": cfg.chips.model_dump(mode="json"),
         "split": cfg.split.model_dump(mode="json"),
         "patch_size": cfg.model.patch_size,
+        # chip channel layout follows the imagery config — changing bands or
+        # resolution must invalidate previously written chips
+        "bands": list(cfg.imagery.bands),
+        "target_resolution_m": cfg.imagery.target_resolution_m,
     }
     inputs = [store.osm_labels, store.gba_buildings, store.stac_catalog]
     if store.is_fresh(store.chips_index, cfg_slice, inputs=inputs):

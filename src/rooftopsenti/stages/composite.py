@@ -344,8 +344,15 @@ def _composite_one(
         logger.info("{} range {}: computing median composite ...", tile, range_idx)
         comp = comp.compute()
         if int((np.asarray(comp.values) != NODATA).sum()) == 0:
-            logger.warning("{} range {}: composite empty — skipping", tile, range_idx)
-            return
+            # With fail_on_error=False, failed reads (e.g. bad/expired S3
+            # credentials) silently become nodata — surface that loudly instead
+            # of leaving a stale composite from a previous config in place.
+            raise RuntimeError(
+                f"{tile} range {range_idx}: composite is all-nodata. Items were "
+                "found, so reads likely failed — check credentials "
+                "(CDSE_S3_ACCESS_KEY/CDSE_S3_SECRET_KEY for cdse_mosaics) and "
+                "network, then re-run `composite`."
+            )
         _write_cog(comp, out_path)
 
     register_composite(
