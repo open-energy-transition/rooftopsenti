@@ -8,18 +8,43 @@ conventions.
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pystac
+import pystac.stac_io
 import rasterio
 import rasterio.warp
+from loguru import logger
 from shapely.geometry import box, mapping
+
+
+class _AtomicStacIO(pystac.stac_io.DefaultStacIO):
+    """Write catalog JSON via tmp-file + rename so a crash mid-write can never
+    leave a half-written (binary-garbage) catalog behind."""
+
+    def write_text_to_href(self, href: str, txt: str) -> None:
+        dest = Path(href)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_suffix(dest.suffix + ".tmp")
+        tmp.write_text(txt, encoding="utf-8")
+        os.replace(tmp, dest)
 
 
 def _open_or_create(catalog_path: Path, region: str) -> pystac.Catalog:
     if catalog_path.exists():
-        return pystac.Catalog.from_file(str(catalog_path))
+        try:
+            return pystac.Catalog.from_file(str(catalog_path))
+        except (ValueError, pystac.STACError) as exc:
+            # e.g. power loss mid-write left garbage bytes. Safe to rebuild:
+            # the COGs are the source of truth and the composite stage
+            # re-registers every fresh tile on each run.
+            logger.warning(
+                "Local STAC catalog {} is corrupt ({}) — rebuilding from scratch",
+                catalog_path,
+                type(exc).__name__,
+            )
     catalog = pystac.Catalog(
         id=f"rooftopsenti-{region}",
         description=f"Cloud-free Sentinel-2 composites for region '{region}' "
@@ -110,7 +135,7 @@ def _register_composite_locked(
         catalog.remove_item(item_id)
     catalog.add_item(item)
     catalog.normalize_hrefs(str(catalog_path.parent))
-    catalog.save(catalog_type=pystac.CatalogType.SELF_CONTAINED)
+    catalog.save(catalog_type=pystac.CatalogType.SELF_CONTAINED, stac_io=_AtomicStacIO())
     return item
 
 

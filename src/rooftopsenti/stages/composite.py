@@ -304,7 +304,18 @@ def run(cfg: Config, store: ArtifactStore, only_tiles: list[str] | None = None) 
         for range_idx, date_range in enumerate(cfg.imagery.date_ranges):
             out_path = store.composite_tif(tile, range_idx)
             if store.is_fresh(out_path, cfg_slice):
-                logger.info("{} range {}: fresh — skipping", tile, range_idx)
+                # cheap and idempotent — keeps the catalog converged with the
+                # COGs on disk even after a crash corrupted/lost the catalog
+                register_composite(
+                    store.stac_catalog,
+                    cfg.region,
+                    tile,
+                    range_idx,
+                    out_path,
+                    tuple(date_range),
+                    cfg.imagery.bands,
+                )
+                logger.info("{} range {}: fresh — re-registered, skipping", tile, range_idx)
                 continue
             try:
                 _composite_one(cfg, store, boundary, tile, range_idx, date_range, cfg_slice)
