@@ -16,3 +16,4 @@ lightning_logs/
 # notebooks / scratch
 *.ipynb_checkpoints
 scratch/
+.cdse_credentials
