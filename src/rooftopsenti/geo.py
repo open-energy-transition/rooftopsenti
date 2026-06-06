@@ -58,6 +58,24 @@ def mgrs_tiles_for_geometry(
     return sorted(tiles)
 
 
+def mgrs_tile_polygon(tile: str) -> BaseGeometry:
+    """WGS84 footprint of a 100 km MGRS cell (e.g. '31UFT').
+
+    Used to clip per-tile raster work to the tile itself instead of the whole
+    AOI. The cell is a 100x100 km square in its UTM zone; edges are densified
+    before reprojection so the WGS84 outline follows the curved UTM graticule.
+    """
+    from shapely import Point, box, segmentize
+
+    sw_lat, sw_lon = mgrs.MGRS().toLatLon(tile)  # SW corner of the cell
+    zone = int(tile[:2])
+    north = tile[2].upper() >= "N"  # latitude bands N..X are the northern hemisphere
+    epsg = (32600 if north else 32700) + zone
+    sw = gpd.GeoSeries([Point(sw_lon, sw_lat)], crs=WGS84).to_crs(epsg).iloc[0]
+    cell = segmentize(box(sw.x, sw.y, sw.x + 100_000, sw.y + 100_000), 5_000)
+    return gpd.GeoSeries([cell], crs=epsg).to_crs(WGS84).iloc[0]
+
+
 def bbox_grid(
     bounds: tuple[float, float, float, float], step_deg: float
 ) -> list[tuple[float, float, float, float]]:

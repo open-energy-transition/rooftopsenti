@@ -10,10 +10,13 @@ scale, and flag large buildings that have visible solar but **no solar mapping i
 2. **Labels** — extract large rooftop solar polygons (`power=generator` +
    `generator:source=solar`, area ≥ 1000 m², on a building) from OpenStreetMap via the
    Overpass API. These are the training positives.
-3. **Imagery** — build multi-temporal **cloud-free Sentinel-2 L2A composites** per MGRS tile
-   from the [Element84 Earth Search](https://element84.com/earth-search/) **STAC** catalog
-   (via [S2Mosaic](https://github.com/DPIRD-DMA/S2Mosaic)), written as COGs and catalogued in
-   a local STAC collection.
+3. **Imagery** — per-MGRS-tile **cloud-free Sentinel-2 composites**, written as COGs and
+   catalogued in a local STAC collection. Three `imagery.stac_source` backends:
+   - `cdse_mosaics` *(default in the shipped configs)* — pre-composited
+     [CDSE quarterly cloudless mosaics](https://dataspace.copernicus.eu/news/2023-11-28-quarterly-cloudless-sentinel-2-mosaics-available-data-collections-and-copernicus)
+     (10 m, B02/B03/B04/B08). No per-scene downloads — ~95% less transfer; ideal on slow links.
+   - `planetary_computer` / `earth_search` — full 10-band L2A scene compositing
+     (SCL cloud mask + temporal median); bandwidth-heavy but gives SWIR/red-edge bands.
 4. **Buildings** — fetch [GlobalBuildingAtlas LoD1](https://github.com/zhu-xlab/GlobalBuildingAtlas)
    footprints and keep only **large buildings** (≥ 1000 m²). These define the inference ROIs.
 5. **Model** — U-Net semantic segmentation ([TorchGeo](https://torchgeo.org/) +
@@ -29,6 +32,15 @@ scale, and flag large buildings that have visible solar but **no solar mapping i
 pixi install
 pixi run smoke               # end-to-end on a tiny AOI (Venlo, NL)
 pixi run test
+```
+
+The default imagery backend (`cdse_mosaics`) reads from `s3://eodata` and needs **free**
+Copernicus Data Space credentials: [register](https://dataspace.copernicus.eu), create an
+S3 key pair at <https://eodata-s3keysmanager.dataspace.copernicus.eu>, then:
+
+```bash
+export CDSE_S3_ACCESS_KEY=...
+export CDSE_S3_SECRET_KEY=...
 ```
 
 Full pipeline for a region:
@@ -62,6 +74,6 @@ since OSM cannot be treated as ground truth.
 
 ## Data sources & licenses
 
-- Sentinel-2 L2A: Copernicus, free
+- Sentinel-2 L2A & quarterly cloudless mosaics: Copernicus, free
 - OpenStreetMap: © OSM contributors, ODbL
 - GlobalBuildingAtlas (TUM): polygons ODbL; heights/LoD1 CC BY-NC 4.0

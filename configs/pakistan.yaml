@@ -20,11 +20,11 @@ osm:
   timeout_s: 300
 
 imagery:
-  stac_source: planetary_computer   # EU-hosted data; earth_search for AWS us-west-2
-  collection: sentinel-2-l2a
+  stac_source: cdse_mosaics          # mosaics are global; bands must match the NL-trained model
+  collection: sentinel-2-global-mosaics
   date_ranges:
     - ["2023-10-01", "2024-03-31"]   # dry season — fewer clouds
-  bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
+  bands: [B02, B03, B04, B08]
   composite_method: median
   cloud_mask: scl
   target_resolution_m: 10

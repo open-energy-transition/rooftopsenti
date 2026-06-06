@@ -49,8 +49,12 @@ class OSMConfig(BaseModel):
     timeout_s: int = 300
 
 
+# Bands available in the CDSE Sentinel-2 quarterly cloudless mosaics (10 m, int16)
+CDSE_MOSAIC_BANDS = ("B02", "B03", "B04", "B08")
+
+
 class ImageryConfig(BaseModel):
-    stac_source: Literal["earth_search", "planetary_computer"] = "earth_search"
+    stac_source: Literal["earth_search", "planetary_computer", "cdse_mosaics"] = "earth_search"
     stac_url: str | None = None  # defaults per stac_source when omitted
     collection: str = "sentinel-2-l2a"
     date_ranges: list[DateRange]
@@ -70,7 +74,22 @@ class ImageryConfig(BaseModel):
             self.stac_url = {
                 "earth_search": "https://earth-search.aws.element84.com/v1",
                 "planetary_computer": "https://planetarycomputer.microsoft.com/api/stac/v1",
+                "cdse_mosaics": "https://stac.dataspace.copernicus.eu/v1",
             }[self.stac_source]
+        if self.stac_source == "cdse_mosaics":
+            if "collection" not in self.model_fields_set:
+                self.collection = "sentinel-2-global-mosaics"
+            unavailable = [b for b in self.bands if b not in CDSE_MOSAIC_BANDS]
+            if unavailable:
+                raise ValueError(
+                    f"cdse_mosaics only provides bands {list(CDSE_MOSAIC_BANDS)}; "
+                    f"remove {unavailable} from imagery.bands"
+                )
+            if self.cloud_mask != "scl":
+                raise ValueError(
+                    "cdse_mosaics is pre-composited (cloud-free); cloud_mask has no "
+                    "effect — leave it at the default 'scl'"
+                )
         return self
 
     @field_validator("date_ranges")

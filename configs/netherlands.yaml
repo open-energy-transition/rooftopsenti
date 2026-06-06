@@ -19,13 +19,17 @@ osm:
   timeout_s: 300
 
 imagery:
-  stac_source: planetary_computer   # EU-hosted data; earth_search for AWS us-west-2
-  collection: sentinel-2-l2a
+  # cdse_mosaics: pre-composited quarterly cloudless mosaics (B02/B03/B04/B08 only,
+  # ~95% less download than scene compositing; needs free CDSE S3 keys in
+  # CDSE_S3_ACCESS_KEY / CDSE_S3_SECRET_KEY). Alternatives: planetary_computer |
+  # earth_search (full 10-band scene compositing, bandwidth-heavy).
+  stac_source: cdse_mosaics
+  collection: sentinel-2-global-mosaics
   date_ranges:
-    - ["2023-04-01", "2023-09-30"]
-  bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
+    - ["2023-04-01", "2023-09-30"]   # spans mosaic quarters Q2+Q3 -> median of 2
+  bands: [B02, B03, B04, B08]        # all the mosaics provide (no SWIR/red-edge)
   composite_method: median   # median | medoid (via S2Mosaic)
-  cloud_mask: scl            # scl | omnicloudmask (OCM is better but needs GPU to be fast)
+  cloud_mask: scl            # scl | omnicloudmask (unused for cdse_mosaics)
   target_resolution_m: 10
   tiles: null                # optional MGRS whitelist; null = all tiles intersecting AOI
 

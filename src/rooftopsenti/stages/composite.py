@@ -4,11 +4,16 @@ Primary backend (``cloud_mask: scl``): query a STAC catalog with pystac-client,
 lazily load with odc-stac, mask clouds with the L2A Scene Classification Layer,
 and reduce with a temporal median. Runs anywhere, no GPU.
 
-Two STAC sources (``imagery.stac_source``):
+Three STAC sources (``imagery.stac_source``):
 - ``earth_search`` — Element84, free, no auth; data in AWS us-west-2 (fast from
   the Americas, transatlantic-slow from Europe).
 - ``planetary_computer`` — Microsoft, free, anonymous SAS URL signing; data in
   Azure West Europe (fast from Europe).
+- ``cdse_mosaics`` — Copernicus Data Space quarterly cloudless mosaics
+  (pre-composited L3, B02/B03/B04/B08 only). No per-scene downloads at all:
+  one mosaic per tile per quarter, ~95% less transfer than scene compositing.
+  Requires free CDSE S3 credentials in ``CDSE_S3_ACCESS_KEY`` /
+  ``CDSE_S3_SECRET_KEY`` (https://eodata-s3keysmanager.dataspace.copernicus.eu).
 
 Optional backend (``cloud_mask: omnicloudmask``): delegate to S2Mosaic
 (OmniCloudMask deep-learning mask; always queries Planetary Computer).
@@ -26,7 +31,8 @@ import pystac_client
 import xarray as xr
 from loguru import logger
 
-from ..config import Config
+from ..config import CDSE_MOSAIC_BANDS, Config
+from ..geo import mgrs_tile_polygon
 from ..io_artifacts import ArtifactStore
 from ..stac_catalog import register_composite
 from . import aoi
@@ -62,12 +68,44 @@ def _source_spec(cfg: Config) -> dict:
             "tile_query": lambda tile: {"s2:mgrs_tile": {"eq": tile}},
             "modifier": pc.sign_inplace,
             "patch_url": pc.sign,
+            "precomposited": False,
+        }
+    if cfg.imagery.stac_source == "cdse_mosaics":
+        return {
+            "assets": {b: b for b in CDSE_MOSAIC_BANDS},
+            "tile_query": lambda tile: {"grid:code": {"eq": f"MGRS-{tile}"}},
+            "modifier": None,
+            "patch_url": None,
+            "precomposited": True,
         }
     return {
         "assets": EARTH_SEARCH_ASSETS,
         "tile_query": lambda tile: {"grid:code": {"eq": f"MGRS-{tile}"}},
         "modifier": None,
         "patch_url": None,
+        "precomposited": False,
+    }
+
+
+def _cdse_s3_gdal_env() -> dict[str, str]:
+    """GDAL/rasterio env for s3://eodata (CDSE object storage; auth required)."""
+    import os
+
+    access = os.environ.get("CDSE_S3_ACCESS_KEY")
+    secret = os.environ.get("CDSE_S3_SECRET_KEY")
+    if not (access and secret):
+        raise RuntimeError(
+            "stac_source=cdse_mosaics reads from s3://eodata, which needs (free) "
+            "CDSE S3 credentials: register at https://dataspace.copernicus.eu, "
+            "create a key pair at https://eodata-s3keysmanager.dataspace.copernicus.eu, "
+            "then export CDSE_S3_ACCESS_KEY and CDSE_S3_SECRET_KEY"
+        )
+    return {
+        "AWS_ACCESS_KEY_ID": access,
+        "AWS_SECRET_ACCESS_KEY": secret,
+        "AWS_S3_ENDPOINT": "eodata.dataspace.copernicus.eu",
+        "AWS_VIRTUAL_HOSTING": "FALSE",
+        "AWS_HTTPS": "YES",
     }
 
 # SCL classes to KEEP: 4 vegetation, 5 not-vegetated, 6 water, 7 unclassified.
@@ -80,15 +118,24 @@ NODATA = 0
 def _search_items(tile: str, date_range: tuple[str, str], cfg: Config):
     spec = _source_spec(cfg)
     catalog = pystac_client.Client.open(cfg.imagery.stac_url, modifier=spec["modifier"])
+    query = dict(spec["tile_query"](tile))
+    if not spec["precomposited"]:
+        # mosaic items carry no eo:cloud_cover — they are already cloud-free
+        query["eo:cloud_cover"] = {"lt": cfg.imagery.max_cloud_pct}
     search = catalog.search(
         collections=[cfg.imagery.collection],
         datetime=f"{date_range[0]}/{date_range[1]}",
-        query={
-            **spec["tile_query"](tile),
-            "eo:cloud_cover": {"lt": cfg.imagery.max_cloud_pct},
-        },
+        query=query,
     )
     items = list(search.items())
+
+    if spec["precomposited"]:
+        # one mosaic per quarter; keep them all (median across quarters later)
+        items.sort(key=lambda i: i.datetime)
+        logger.info(
+            "{}: {} quarterly mosaics in {}..{}", tile, len(items), *date_range
+        )
+        return items
 
     # one item per solar day (PC keeps reprocessing duplicates), then keep only
     # the N clearest scenes — every extra scene costs real download time
@@ -147,12 +194,48 @@ def _scl_median_composite(
             reduced.append(da.mean(dim="time", skipna=True))
         else:  # median (default); medoid not supported on this backend
             reduced.append(da.median(dim="time", skipna=True))
+    return _stack_bands(reduced, bands, ds)
+
+
+def _stack_bands(reduced: list[xr.DataArray], bands: list[str], ds) -> xr.DataArray:
+    """(band, y, x) uint16 stack with our NODATA and the source CRS."""
     comp = xr.concat(reduced, dim="band")
     comp = comp.fillna(NODATA).round().astype("uint16")
     comp = comp.assign_coords(band=bands)
     comp.rio.write_crs(str(ds.odc.crs), inplace=True)
     comp.rio.write_nodata(NODATA, inplace=True)
     return comp
+
+
+def _mosaic_median_composite(
+    items, bands: list[str], aoi_geom, cfg: Config
+) -> xr.DataArray:
+    """CDSE quarterly mosaics are already cloud-free: load and merge quarters.
+
+    Mosaic COGs are int16 with nodata -32768 (and the occasional residual
+    negative reflectance); ``> 0`` masks both before the across-quarter median.
+    """
+    spec = _source_spec(cfg)
+    ds = odc.stac.load(
+        items,
+        bands=[spec["assets"][b] for b in bands],
+        geopolygon=aoi_geom,
+        resolution=cfg.imagery.target_resolution_m,
+        groupby="solar_day",
+        chunks={"x": 2048, "y": 2048},
+        dtype="int16",
+        resampling="bilinear",
+        fail_on_error=False,
+    )
+    reduced = []
+    for b in bands:
+        da = ds[spec["assets"][b]]
+        da = da.where(da > 0)
+        if cfg.imagery.composite_method == "mean":
+            reduced.append(da.mean(dim="time", skipna=True))
+        else:
+            reduced.append(da.median(dim="time", skipna=True))
+    return _stack_bands(reduced, bands, ds)
 
 
 def _write_cog(comp: xr.DataArray, out_path: Path) -> None:
@@ -207,6 +290,9 @@ def run(cfg: Config, store: ArtifactStore, only_tiles: list[str] | None = None) 
     os.environ.setdefault("GDAL_HTTP_MAX_RETRY", "5")
     os.environ.setdefault("GDAL_HTTP_RETRY_DELAY", "2")
 
+    if cfg.imagery.stac_source == "cdse_mosaics":
+        os.environ.update(_cdse_s3_gdal_env())
+
     cfg_slice = cfg.imagery.model_dump(mode="json")
     boundary = aoi.load_boundary(store)
     tiles = aoi.load_tiles(store)
@@ -241,11 +327,20 @@ def _composite_one(
     if cfg.imagery.cloud_mask == "omnicloudmask":
         _composite_s2mosaic(tile, tuple(date_range), cfg, out_path)
     else:
+        # clip raster work to this tile (not the whole AOI — at country scale a
+        # boundary-sized geobox per tile would be huge and mostly nodata)
+        tile_geom = mgrs_tile_polygon(tile).intersection(boundary)
+        if tile_geom.is_empty:
+            logger.warning("{} range {}: tile outside AOI — skipping", tile, range_idx)
+            return
         items = _search_items(tile, tuple(date_range), cfg)
         if not items:
             logger.warning("{} range {}: no items found — skipping", tile, range_idx)
             return
-        comp = _scl_median_composite(items, cfg.imagery.bands, boundary, cfg)
+        if _source_spec(cfg)["precomposited"]:
+            comp = _mosaic_median_composite(items, cfg.imagery.bands, tile_geom, cfg)
+        else:
+            comp = _scl_median_composite(items, cfg.imagery.bands, tile_geom, cfg)
         logger.info("{} range {}: computing median composite ...", tile, range_idx)
         comp = comp.compute()
         if int((np.asarray(comp.values) != NODATA).sum()) == 0:

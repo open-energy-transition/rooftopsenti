@@ -12,7 +12,27 @@ CONFIGS_DIR = Path(__file__).parents[1] / "configs"
 def test_shipped_configs_load(name):
     cfg = load_config(CONFIGS_DIR / f"{name}.yaml")
     assert cfg.region == name.replace("smoke_nl_tile", "smoke_nl_tile")
-    assert cfg.in_channels == len(cfg.imagery.bands) == 10
+    # all shipped configs use the CDSE quarterly mosaics (4 bands)
+    assert cfg.in_channels == len(cfg.imagery.bands) == 4
+
+
+def test_cdse_mosaics_defaults_and_band_validation():
+    base = {
+        "region": "x",
+        "aoi": {"source": "bbox", "bbox": [6.0, 51.0, 7.0, 52.0]},
+        "imagery": {
+            "stac_source": "cdse_mosaics",
+            "date_ranges": [["2023-04-01", "2023-09-30"]],
+            "bands": ["B02", "B03", "B04", "B08"],
+        },
+    }
+    cfg = Config.model_validate(base)
+    assert cfg.imagery.collection == "sentinel-2-global-mosaics"
+    assert cfg.imagery.stac_url == "https://stac.dataspace.copernicus.eu/v1"
+
+    bad = {**base, "imagery": {**base["imagery"], "bands": ["B02", "B03", "B04", "B11"]}}
+    with pytest.raises(ValidationError, match="B11"):
+        Config.model_validate(bad)
 
 
 def test_bbox_source_requires_bbox():

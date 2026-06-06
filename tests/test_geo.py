@@ -35,6 +35,20 @@ def test_mgrs_tiles_for_geometry_venlo():
     assert len(tiles) <= 6
 
 
+def test_mgrs_tile_polygon_roundtrip():
+    import mgrs
+
+    m = mgrs.MGRS()
+    for tile in ("32ULB", "31UFT", "42RVR"):  # NL (two zones) + Pakistan
+        poly = geo.mgrs_tile_polygon(tile)
+        # the cell centre must map back to the same tile name
+        c = poly.centroid
+        assert m.toMGRS(c.y, c.x, MGRSPrecision=0) == tile
+        # ~100x100 km
+        area = gpd.GeoSeries([poly], crs="EPSG:4326").to_crs(geo.EQUAL_AREA).area.iloc[0]
+        assert 0.9e10 < area < 1.1e10
+
+
 def test_bbox_grid_covers_bounds():
     cells = geo.bbox_grid((6.0, 51.0, 7.3, 52.2), 0.5)
     assert len(cells) == 3 * 3
