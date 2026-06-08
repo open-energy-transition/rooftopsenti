@@ -1,0 +1,68 @@
+# M4 transfer pilot: Lahore metro (Pakistan). Inference-only — apply the
+# NL-trained model here to validate cross-region transfer before committing to
+# all 42 Punjab tiles. Detections are CANDIDATES (OSM solar is sparse here).
+#
+#   rooftopsenti aoi       -c configs/pakistan_lahore.yaml
+#   rooftopsenti composite -c configs/pakistan_lahore.yaml
+#   rooftopsenti gba       -c configs/pakistan_lahore.yaml
+#   rooftopsenti infer     -c configs/pakistan_lahore.yaml \
+#       --model-ckpt data/netherlands/models/8af0b2fbff/best.ckpt
+#   rooftopsenti postprocess -c configs/pakistan_lahore.yaml
+#   rooftopsenti report      -c configs/pakistan_lahore.yaml
+region: pakistan_lahore
+
+aoi:
+  source: bbox
+  bbox: [73.9, 31.2, 74.8, 31.9]   # W,S,E,N — Lahore metro (tiles 43RDQ/43RDR)
+
+overture:
+  release: "2026-05-20.0"
+
+osm:
+  source: overture
+  overpass_url: https://overpass-api.de/api/interpreter
+  solar_area_min_m2: 1000
+  rooftop_rule: intersect_or_roof_tag
+  chunk_deg: 0.5
+  timeout_s: 300
+
+imagery:
+  stac_source: earthgenome        # same source/bands as the NL training model
+  collection: sentinel2-temporal-mosaics
+  date_ranges:
+    - ["2023-02-01", "2023-12-31"]   # the 2023 yearly mosaic only (2023-01-01 also matches 2022's)
+  bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
+  composite_method: median
+  cloud_mask: scl
+  target_resolution_m: 10
+  tiles: null
+
+gba:
+  source: overture
+  building_area_min_m2: 1000
+
+model:
+  arch: unet
+  encoder: resnet18
+  pretrained: ssl4eo_s2_moco
+  num_classes: 2
+  loss: focal_dice
+  lr: 1.0e-4
+  batch_size: 32
+  patch_size: 256
+  max_epochs: 60
+  device: auto
+
+chips:
+  pos_per_label: 4
+  neg_ratio: 5
+
+postprocess:
+  prob_threshold: 0.4          # lower threshold + manual review in transfer regions
+  building_coverage_min: 0.10
+  min_solar_area_m2: 1000
+
+split:
+  block_size_km: 25
+  ratios: { train: 0.70, val: 0.15, test: 0.15 }
+  seed: 42

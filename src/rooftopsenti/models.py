@@ -49,7 +49,10 @@ def _load_ssl4eo_encoder(task: SemanticSegmentationTask, cfg: Config) -> None:
     conv1_key = "conv1.weight"
     state_dict[conv1_key] = state_dict[conv1_key][:, band_idx, :, :].clone()
 
-    missing, unexpected = task.model.encoder.load_state_dict(state_dict, strict=False)
+    # smp encoders override load_state_dict and return None (instead of the
+    # usual IncompatibleKeys tuple) — don't unpack the result
+    result = task.model.encoder.load_state_dict(state_dict, strict=False)
+    missing, unexpected = result if result is not None else ((), ())
     logger.info(
         "Loaded SSL4EO {} weights (bands {}); missing={}, unexpected={}",
         cfg.model.encoder,

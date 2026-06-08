@@ -132,6 +132,17 @@ def _register_composite_locked(
 
     existing = catalog.get_item(item_id)
     if existing is not None:
+        same = (
+            existing.assets.get("composite") is not None
+            and existing.assets["composite"].href == item.assets["composite"].href
+            and existing.properties.get("rooftopsenti:bands") == bands
+            and existing.properties.get("start_datetime") == item.properties["start_datetime"]
+            and existing.properties.get("end_datetime") == item.properties["end_datetime"]
+        )
+        if same:
+            # idempotent re-register: don't rewrite the catalog, so its mtime
+            # stays stable and downstream freshness checks aren't invalidated
+            return existing
         catalog.remove_item(item_id)
     catalog.add_item(item)
     catalog.normalize_hrefs(str(catalog_path.parent))

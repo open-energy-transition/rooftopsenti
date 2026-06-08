@@ -18,11 +18,11 @@ osm:
   timeout_s: 180
 
 imagery:
-  stac_source: cdse_mosaics         # pre-composited quarterly mosaics; needs CDSE S3 keys
-  collection: sentinel-2-global-mosaics
+  stac_source: earthgenome          # pre-composited yearly mosaics; public, no auth
+  collection: sentinel2-temporal-mosaics
   date_ranges:
-    - ["2023-06-01", "2023-07-31"]  # touches mosaic quarters Q2+Q3
-  bands: [B02, B03, B04, B08]       # all the mosaics provide
+    - ["2023-06-01", "2023-07-31"]  # intersects the 2023 yearly mosaic
+  bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
   composite_method: median
   cloud_mask: scl
   target_resolution_m: 10

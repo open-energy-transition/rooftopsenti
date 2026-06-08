@@ -52,9 +52,17 @@ class OSMConfig(BaseModel):
 # Bands available in the CDSE Sentinel-2 quarterly cloudless mosaics (10 m, int16)
 CDSE_MOSAIC_BANDS = ("B02", "B03", "B04", "B08")
 
+# Bands in the Earth Genome Sentinel-2 temporal mosaics (~19 m Web Mercator
+# px ≈ 12 m ground at 52°N, uint16, public HTTPS on Source Cooperative)
+EARTHGENOME_MOSAIC_BANDS = (
+    "B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B09", "B11", "B12",
+)
+
 
 class ImageryConfig(BaseModel):
-    stac_source: Literal["earth_search", "planetary_computer", "cdse_mosaics"] = "earth_search"
+    stac_source: Literal[
+        "earth_search", "planetary_computer", "cdse_mosaics", "earthgenome"
+    ] = "earthgenome"
     stac_url: str | None = None  # defaults per stac_source when omitted
     collection: str = "sentinel-2-l2a"
     date_ranges: list[DateRange]
@@ -75,20 +83,26 @@ class ImageryConfig(BaseModel):
                 "earth_search": "https://earth-search.aws.element84.com/v1",
                 "planetary_computer": "https://planetarycomputer.microsoft.com/api/stac/v1",
                 "cdse_mosaics": "https://stac.dataspace.copernicus.eu/v1",
+                "earthgenome": "https://stac.earthgenome.org",
             }[self.stac_source]
-        if self.stac_source == "cdse_mosaics":
+        mosaic_sources = {
+            "cdse_mosaics": ("sentinel-2-global-mosaics", CDSE_MOSAIC_BANDS),
+            "earthgenome": ("sentinel2-temporal-mosaics", EARTHGENOME_MOSAIC_BANDS),
+        }
+        if self.stac_source in mosaic_sources:
+            default_collection, available = mosaic_sources[self.stac_source]
             if "collection" not in self.model_fields_set:
-                self.collection = "sentinel-2-global-mosaics"
-            unavailable = [b for b in self.bands if b not in CDSE_MOSAIC_BANDS]
+                self.collection = default_collection
+            unavailable = [b for b in self.bands if b not in available]
             if unavailable:
                 raise ValueError(
-                    f"cdse_mosaics only provides bands {list(CDSE_MOSAIC_BANDS)}; "
+                    f"{self.stac_source} only provides bands {list(available)}; "
                     f"remove {unavailable} from imagery.bands"
                 )
             if self.cloud_mask != "scl":
                 raise ValueError(
-                    "cdse_mosaics is pre-composited (cloud-free); cloud_mask has no "
-                    "effect — leave it at the default 'scl'"
+                    f"{self.stac_source} is pre-composited (cloud-free); cloud_mask "
+                    "has no effect — leave it at the default 'scl'"
                 )
         return self
 
@@ -114,6 +128,10 @@ class GBAConfig(BaseModel):
 class ModelConfig(BaseModel):
     arch: Literal["unet"] = "unet"
     encoder: str = "resnet18"
+    # Additional regions whose chips are merged into train/val (their pipelines
+    # must have produced chips with the SAME bands). Test metrics stay on the
+    # primary region only, so they remain interpretable.
+    train_regions: list[str] = Field(default_factory=list)
     pretrained: str | None = "ssl4eo_s2_moco"
     num_classes: int = 2
     loss: Literal["focal_dice", "ce", "focal"] = "focal_dice"

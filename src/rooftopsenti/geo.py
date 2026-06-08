@@ -58,6 +58,13 @@ def mgrs_tiles_for_geometry(
     return sorted(tiles)
 
 
+def mgrs_tile_epsg(tile: str) -> int:
+    """EPSG code of the UTM zone an MGRS tile is gridded in (e.g. '31UFT' -> 32631)."""
+    zone = int(tile[:2])
+    north = tile[2].upper() >= "N"  # latitude bands N..X are the northern hemisphere
+    return (32600 if north else 32700) + zone
+
+
 def mgrs_tile_polygon(tile: str) -> BaseGeometry:
     """WGS84 footprint of a 100 km MGRS cell (e.g. '31UFT').
 
@@ -68,9 +75,7 @@ def mgrs_tile_polygon(tile: str) -> BaseGeometry:
     from shapely import Point, box, segmentize
 
     sw_lat, sw_lon = mgrs.MGRS().toLatLon(tile)  # SW corner of the cell
-    zone = int(tile[:2])
-    north = tile[2].upper() >= "N"  # latitude bands N..X are the northern hemisphere
-    epsg = (32600 if north else 32700) + zone
+    epsg = mgrs_tile_epsg(tile)
     sw = gpd.GeoSeries([Point(sw_lon, sw_lat)], crs=WGS84).to_crs(epsg).iloc[0]
     cell = segmentize(box(sw.x, sw.y, sw.x + 100_000, sw.y + 100_000), 5_000)
     return gpd.GeoSeries([cell], crs=epsg).to_crs(WGS84).iloc[0]

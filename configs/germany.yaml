@@ -1,12 +1,18 @@
-# Transfer target (M4): inference-only — model trained on well-mapped regions (NL/DE).
-# OSM solar coverage is sparse here, so detections are *candidates* requiring review.
-region: vietnam
+# Training-label region (M2+): Germany has the densest OSM mapping of large
+# rooftop solar in Europe — several thousand polygons vs ~700 in NL. Used to
+# enlarge the training set; chips from multiple regions can be combined.
+#
+# Country-scale Germany spans ~110 MGRS tiles. To start smaller, restrict to a
+# Bundesland with dense industrial rooftop PV, e.g.:
+#   admin_level: 1
+#   admin_name: Bayern          # or Nordrhein-Westfalen, Baden-Württemberg
+region: germany
 
 aoi:
   source: geoboundaries
-  iso3: VNM
-  admin_level: 1
-  admin_name: null            # set a province name to run sub-nationally
+  iso3: DEU
+  admin_level: 0
+  admin_name: null
 
 overture:
   release: "2026-05-20.0"
@@ -14,16 +20,16 @@ overture:
 osm:
   source: overture           # overture (default, no rate limits) | overpass (live OSM)
   overpass_url: https://overpass-api.de/api/interpreter
-  solar_area_min_m2: 1000
+  solar_area_min_m2: 1000    # ~10 Sentinel-2 pixels
   rooftop_rule: intersect_or_roof_tag
-  chunk_deg: 1.0
+  chunk_deg: 0.5
   timeout_s: 300
 
 imagery:
-  stac_source: earthgenome           # global yearly mosaics; bands must match the NL-trained model
+  stac_source: earthgenome   # same source/bands as NL so chips are compatible
   collection: sentinel2-temporal-mosaics
   date_ranges:
-    - ["2023-12-01", "2024-04-30"]   # intersects the 2023 yearly mosaic (collection ends 2024-01-01)
+    - ["2023-04-01", "2023-09-30"]   # intersects the 2023 yearly mosaic
   bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
   composite_method: median
   cloud_mask: scl
@@ -31,7 +37,7 @@ imagery:
   tiles: null
 
 gba:
-  source: huggingface        # huggingface (GlobalBuildingAtlas) | overture
+  source: overture           # bbox-queryable; huggingface needs multi-GB GBA tiles
   building_area_min_m2: 1000
 
 model:
@@ -51,7 +57,7 @@ chips:
   neg_ratio: 5
 
 postprocess:
-  prob_threshold: 0.4
+  prob_threshold: 0.5
   building_coverage_min: 0.10
   min_solar_area_m2: 1000
 

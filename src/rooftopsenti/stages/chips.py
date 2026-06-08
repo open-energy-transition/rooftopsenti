@@ -133,7 +133,10 @@ def run(cfg: Config, store: ArtifactStore) -> None:
         "bands": list(cfg.imagery.bands),
         "target_resolution_m": cfg.imagery.target_resolution_m,
     }
-    inputs = [store.osm_labels, store.gba_buildings, store.stac_catalog]
+    # track the composite COGs themselves (size+mtime), not catalog.json —
+    # the catalog can be rebuilt/re-registered without the imagery changing
+    composite_paths = sorted(composite_assets(store.stac_catalog).values())
+    inputs = [store.osm_labels, store.gba_buildings, *composite_paths]
     if store.is_fresh(store.chips_index, cfg_slice, inputs=inputs):
         logger.info("Chips fresh — skipping")
         return

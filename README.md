@@ -5,24 +5,29 @@ scale, and flag large buildings that have visible solar but **no solar mapping i
 
 ## How it works
 
-1. **AOI** — resolve a region (country/state/province) to a boundary via
+1. **AOI** - resolve a region (country/state/province) to a boundary via
    [geoBoundaries](https://www.geoboundaries.org/) and derive the Sentinel-2 MGRS tile worklist.
-2. **Labels** — extract large rooftop solar polygons (`power=generator` +
+2. **Labels** - extract large rooftop solar polygons (`power=generator` +
    `generator:source=solar`, area ≥ 1000 m², on a building) from OpenStreetMap via the
    Overpass API. These are the training positives.
-3. **Imagery** — per-MGRS-tile **cloud-free Sentinel-2 composites**, written as COGs and
-   catalogued in a local STAC collection. Three `imagery.stac_source` backends:
-   - `cdse_mosaics` *(default in the shipped configs)* — pre-composited
+3. **Imagery** - per-MGRS-tile **cloud-free Sentinel-2 composites**, written as COGs and
+   catalogued in a local STAC collection. Four `imagery.stac_source` backends:
+   - `earthgenome` *(default in the shipped configs)* - pre-composited
+     [Earth Genome temporal mosaics](https://stac.earthgenome.org/) (yearly, all bands
+     incl. SWIR/red-edge, CC-BY-4.0, public HTTPS on Source Cooperative, no auth;
+     ~19 m Web-Mercator px ≈ 12 m ground at NL latitude).
+   - `cdse_mosaics` - pre-composited
      [CDSE quarterly cloudless mosaics](https://dataspace.copernicus.eu/news/2023-11-28-quarterly-cloudless-sentinel-2-mosaics-available-data-collections-and-copernicus)
-     (10 m, B02/B03/B04/B08). No per-scene downloads — ~95% less transfer; ideal on slow links.
-   - `planetary_computer` / `earth_search` — full 10-band L2A scene compositing
-     (SCL cloud mask + temporal median); bandwidth-heavy but gives SWIR/red-edge bands.
-4. **Buildings** — fetch [GlobalBuildingAtlas LoD1](https://github.com/zhu-xlab/GlobalBuildingAtlas)
+     (native 10 m but only B02/B03/B04/B08; needs free CDSE S3 keys).
+   - `planetary_computer` / `earth_search` - full 10-band L2A scene compositing
+     (SCL cloud mask + temporal median); bandwidth-heavy but native 10 m and
+     custom date windows.
+4. **Buildings** - fetch [GlobalBuildingAtlas LoD1](https://github.com/zhu-xlab/GlobalBuildingAtlas)
    footprints and keep only **large buildings** (≥ 1000 m²). These define the inference ROIs.
-5. **Model** — U-Net semantic segmentation ([TorchGeo](https://torchgeo.org/) +
+5. **Model** - U-Net semantic segmentation ([TorchGeo](https://torchgeo.org/) +
    SSL4EO Sentinel-2 pretrained encoder), trained on chips around OSM labels with hard
    negatives sampled from solar-free large buildings.
-6. **Inference** — run only on composite windows containing a large building, aggregate
+6. **Inference** - run only on composite windows containing a large building, aggregate
    predicted solar pixels per building footprint, and compare with OSM to output a
    **`missing_in_osm`** candidate list (GeoParquet/GeoJSON + HTML map).
 
@@ -34,9 +39,10 @@ pixi run smoke               # end-to-end on a tiny AOI (Venlo, NL)
 pixi run test
 ```
 
-The default imagery backend (`cdse_mosaics`) reads from `s3://eodata` and needs **free**
-Copernicus Data Space credentials: [register](https://dataspace.copernicus.eu), create an
-S3 key pair at <https://eodata-s3keysmanager.dataspace.copernicus.eu>, then:
+The default imagery backend (`earthgenome`) needs no credentials. The optional
+`cdse_mosaics` backend reads from `s3://eodata` and needs **free** Copernicus Data Space
+credentials: [register](https://dataspace.copernicus.eu), create an S3 key pair at
+<https://eodata-s3keysmanager.dataspace.copernicus.eu>, then:
 
 ```bash
 export CDSE_S3_ACCESS_KEY=...
@@ -69,11 +75,12 @@ On a machine with an NVIDIA driver use the CUDA env: `pixi run -e cuda rooftopse
 
 Each region is a YAML in `configs/`. The pilot is the **Netherlands** (dense, well-mapped OSM
 rooftop solar). Transfer targets like **Pakistan** and **Vietnam** run inference-only with a
-model trained on well-mapped regions — detections there are candidates requiring manual review,
+model trained on well-mapped regions - detections there are candidates requiring manual review,
 since OSM cannot be treated as ground truth.
 
 ## Data sources & licenses
 
 - Sentinel-2 L2A & quarterly cloudless mosaics: Copernicus, free
+- Earth Genome Sentinel-2 temporal mosaics: CC-BY-4.0, via Source Cooperative
 - OpenStreetMap: © OSM contributors, ODbL
 - GlobalBuildingAtlas (TUM): polygons ODbL; heights/LoD1 CC BY-NC 4.0

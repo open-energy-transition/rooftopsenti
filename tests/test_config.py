@@ -8,12 +8,16 @@ from rooftopsenti.config import Config, load_config
 CONFIGS_DIR = Path(__file__).parents[1] / "configs"
 
 
-@pytest.mark.parametrize("name", ["netherlands", "smoke_nl_tile", "pakistan", "vietnam"])
+@pytest.mark.parametrize(
+    "name", ["netherlands", "germany", "nl_de_pk", "smoke_nl_tile", "pakistan", "vietnam"]
+)
 def test_shipped_configs_load(name):
     cfg = load_config(CONFIGS_DIR / f"{name}.yaml")
-    assert cfg.region == name.replace("smoke_nl_tile", "smoke_nl_tile")
-    # all shipped configs use the CDSE quarterly mosaics (4 bands)
-    assert cfg.in_channels == len(cfg.imagery.bands) == 4
+    # nl_de_pk is a multi-region *training* config rooted in the NL region
+    assert cfg.region == ("netherlands" if name == "nl_de_pk" else name)
+    # all shipped configs use the Earth Genome mosaics (full 10-band stack)
+    assert cfg.imagery.stac_source == "earthgenome"
+    assert cfg.in_channels == len(cfg.imagery.bands) == 10
 
 
 def test_cdse_mosaics_defaults_and_band_validation():
@@ -32,6 +36,26 @@ def test_cdse_mosaics_defaults_and_band_validation():
 
     bad = {**base, "imagery": {**base["imagery"], "bands": ["B02", "B03", "B04", "B11"]}}
     with pytest.raises(ValidationError, match="B11"):
+        Config.model_validate(bad)
+
+
+def test_earthgenome_defaults_and_band_validation():
+    base = {
+        "region": "x",
+        "aoi": {"source": "bbox", "bbox": [6.0, 51.0, 7.0, 52.0]},
+        # no stac_source given — earthgenome is the default imagery source
+        "imagery": {
+            "date_ranges": [["2023-04-01", "2023-09-30"]],
+        },
+    }
+    cfg = Config.model_validate(base)
+    assert cfg.imagery.stac_source == "earthgenome"
+    assert cfg.imagery.collection == "sentinel2-temporal-mosaics"
+    assert cfg.imagery.stac_url == "https://stac.earthgenome.org"
+    assert cfg.in_channels == 10  # default band list is fully available
+
+    bad = {**base, "imagery": {**base["imagery"], "bands": ["B02", "B10"]}}
+    with pytest.raises(ValidationError, match="B10"):
         Config.model_validate(bad)
 
 

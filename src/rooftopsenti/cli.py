@@ -19,6 +19,10 @@ TilesOpt = Annotated[
     str | None, typer.Option("--tiles", help="Comma-separated MGRS tile subset")
 ]
 RunIdOpt = Annotated[str | None, typer.Option("--run-id", help="Model run id")]
+ModelCkptOpt = Annotated[
+    str | None,
+    typer.Option("--model-ckpt", help="External model checkpoint for transfer inference"),
+]
 
 
 def _setup(config_path: Path) -> tuple[Config, ArtifactStore]:
@@ -86,12 +90,23 @@ def train(config: ConfigOpt, run_id: RunIdOpt = None):
 
 
 @app.command()
-def infer(config: ConfigOpt, run_id: RunIdOpt = None, tiles: TilesOpt = None):
-    """f) Run inference on large-building ROI windows."""
+def infer(
+    config: ConfigOpt,
+    run_id: RunIdOpt = None,
+    tiles: TilesOpt = None,
+    model_ckpt: ModelCkptOpt = None,
+):
+    """f) Run inference on large-building ROI windows.
+
+    Use --model-ckpt to apply a model trained in another region (transfer
+    inference), e.g. the NL model on Pakistan composites.
+    """
     from .stages import infer as stage
 
     cfg, store = _setup(config)
-    stage.run(cfg, store, run_id=run_id, only_tiles=_tile_list(tiles))
+    stage.run(
+        cfg, store, run_id=run_id, only_tiles=_tile_list(tiles), model_ckpt=model_ckpt
+    )
 
 
 @app.command()

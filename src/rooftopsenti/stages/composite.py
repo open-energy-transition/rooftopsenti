@@ -14,6 +14,10 @@ Three STAC sources (``imagery.stac_source``):
   one mosaic per tile per quarter, ~95% less transfer than scene compositing.
   Requires free CDSE S3 credentials in ``CDSE_S3_ACCESS_KEY`` /
   ``CDSE_S3_SECRET_KEY`` (https://eodata-s3keysmanager.dataspace.copernicus.eu).
+- ``earthgenome`` — Earth Genome Sentinel-2 temporal mosaics (pre-composited,
+  one mosaic per MGRS tile per year, all bands incl. SWIR/red-edge, CC-BY-4.0).
+  Public HTTPS on Source Cooperative, no auth at all. Stored in EPSG:3857 at
+  ~19 m/px (≈12 m ground at 52°N) — loaded into the tile's UTM grid.
 
 Optional backend (``cloud_mask: omnicloudmask``): delegate to S2Mosaic
 (OmniCloudMask deep-learning mask; always queries Planetary Computer).
@@ -31,8 +35,8 @@ import pystac_client
 import xarray as xr
 from loguru import logger
 
-from ..config import CDSE_MOSAIC_BANDS, Config
-from ..geo import mgrs_tile_polygon
+from ..config import CDSE_MOSAIC_BANDS, EARTHGENOME_MOSAIC_BANDS, Config
+from ..geo import mgrs_tile_epsg, mgrs_tile_polygon
 from ..io_artifacts import ArtifactStore
 from ..stac_catalog import register_composite
 from . import aoi
@@ -77,6 +81,16 @@ def _source_spec(cfg: Config) -> dict:
             "modifier": None,
             "patch_url": None,
             "precomposited": True,
+            "dtype": "int16",  # nodata -32768
+        }
+    if cfg.imagery.stac_source == "earthgenome":
+        return {
+            "assets": {b: b for b in EARTHGENOME_MOSAIC_BANDS},
+            "tile_query": lambda tile: {"grid:code": {"eq": f"MGRS-{tile}"}},
+            "modifier": None,
+            "patch_url": None,
+            "precomposited": True,
+            "dtype": "uint16",  # nodata 0
         }
     return {
         "assets": EARTH_SEARCH_ASSETS,
@@ -106,6 +120,12 @@ def _cdse_s3_gdal_env() -> dict[str, str]:
         "AWS_S3_ENDPOINT": "eodata.dataspace.copernicus.eu",
         "AWS_VIRTUAL_HOSTING": "FALSE",
         "AWS_HTTPS": "YES",
+        # CDSE serves eodata from load-balanced nodes; freshly created keys
+        # can be unknown to a subset of them for a while, yielding spurious
+        # 403 InvalidAccessKeyId. Retrying re-rolls the node assignment.
+        "GDAL_HTTP_RETRY_CODES": "403",
+        "GDAL_HTTP_MAX_RETRY": "8",
+        "GDAL_HTTP_RETRY_DELAY": "1",
     }
 
 # SCL classes to KEEP: 4 vegetation, 5 not-vegetated, 6 water, 7 unclassified.
@@ -208,22 +228,25 @@ def _stack_bands(reduced: list[xr.DataArray], bands: list[str], ds) -> xr.DataAr
 
 
 def _mosaic_median_composite(
-    items, bands: list[str], aoi_geom, cfg: Config
+    items, bands: list[str], aoi_geom, tile: str, cfg: Config
 ) -> xr.DataArray:
-    """CDSE quarterly mosaics are already cloud-free: load and merge quarters.
+    """Pre-composited mosaics are already cloud-free: load and merge periods.
 
-    Mosaic COGs are int16 with nodata -32768 (and the occasional residual
-    negative reflectance); ``> 0`` masks both before the across-quarter median.
+    ``> 0`` masks nodata for both sources (CDSE: int16/-32768 plus the
+    occasional residual negative reflectance; Earth Genome: uint16/0).
+    The output grid is the tile's UTM zone — Earth Genome mosaics are stored
+    in EPSG:3857 and must not leak Web Mercator into downstream stages.
     """
     spec = _source_spec(cfg)
     ds = odc.stac.load(
         items,
         bands=[spec["assets"][b] for b in bands],
         geopolygon=aoi_geom,
+        crs=f"EPSG:{mgrs_tile_epsg(tile)}",
         resolution=cfg.imagery.target_resolution_m,
         groupby="solar_day",
         chunks={"x": 2048, "y": 2048},
-        dtype="int16",
+        dtype=spec["dtype"],
         resampling="bilinear",
         fail_on_error=False,
     )
@@ -349,7 +372,7 @@ def _composite_one(
             logger.warning("{} range {}: no items found — skipping", tile, range_idx)
             return
         if _source_spec(cfg)["precomposited"]:
-            comp = _mosaic_median_composite(items, cfg.imagery.bands, tile_geom, cfg)
+            comp = _mosaic_median_composite(items, cfg.imagery.bands, tile_geom, tile, cfg)
         else:
             comp = _scl_median_composite(items, cfg.imagery.bands, tile_geom, cfg)
         logger.info("{} range {}: computing median composite ...", tile, range_idx)
