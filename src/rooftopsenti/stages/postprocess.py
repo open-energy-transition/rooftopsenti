@@ -109,7 +109,17 @@ def run(cfg: Config, store: ArtifactStore, run_id: str | None = None) -> str:
 
     buildings = read_gdf(store.gba_buildings)
     stats = _aggregate_per_building(predicted, buildings, cfg)
-    osm_solar = read_gdf(store.osm_solar)
+    # inference-only transfer regions may have no OSM solar layer at all — then
+    # every detection is a candidate (nothing to mark as already-mapped)
+    if store.osm_solar.exists():
+        osm_solar = read_gdf(store.osm_solar)
+    else:
+        logger.warning(
+            "No OSM solar layer ({}); treating all detections as candidates "
+            "(run `labels` to flag already-mapped installations)",
+            store.osm_solar,
+        )
+        osm_solar = buildings.iloc[0:0]
     stats = _mark_osm_solar(stats, osm_solar)
     write_gdf(stats, store.output(run_id, "building_solar_stats.parquet"))
 

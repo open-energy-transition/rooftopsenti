@@ -7,6 +7,8 @@ Outputs one solar-probability COG per (tile, date-range).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import rasterio
 import rasterio.windows
@@ -66,11 +68,19 @@ def _predict_windows(model, src, windows, cfg: Config, device: str) -> np.ndarra
 
 
 def run(cfg: Config, store: ArtifactStore, run_id: str | None = None,
-        only_tiles: list[str] | None = None) -> str:
+        only_tiles: list[str] | None = None, model_ckpt: str | None = None) -> str:
     run_id = run_id or cfg.run_id()
-    ckpt = store.model_dir(run_id) / "best.ckpt"
-    if not ckpt.exists():
-        raise FileNotFoundError(f"No trained model at {ckpt} — run `train` first")
+    if model_ckpt is not None:
+        # transfer inference: apply a model trained in another region. Its bands
+        # must match this region's (the input stem is fixed at training time).
+        ckpt = Path(model_ckpt)
+        if not ckpt.exists():
+            raise FileNotFoundError(f"--model-ckpt not found: {ckpt}")
+        logger.info("Transfer inference with external checkpoint {}", ckpt)
+    else:
+        ckpt = store.model_dir(run_id) / "best.ckpt"
+        if not ckpt.exists():
+            raise FileNotFoundError(f"No trained model at {ckpt} — run `train` first")
 
     accelerator = resolve_accelerator(cfg)
     device = "cuda" if accelerator == "gpu" else "cpu"

@@ -150,10 +150,11 @@ def _search_items(tile: str, date_range: tuple[str, str], cfg: Config):
     items = list(search.items())
 
     if spec["precomposited"]:
-        # one mosaic per quarter; keep them all (median across quarters later)
-        items.sort(key=lambda i: i.datetime)
+        # keep every matching mosaic period (median across them later). Mosaic
+        # items carry start/end but a null `datetime`, so sort on start_datetime.
+        items.sort(key=lambda i: i.properties.get("start_datetime") or "")
         logger.info(
-            "{}: {} quarterly mosaics in {}..{}", tile, len(items), *date_range
+            "{}: {} pre-composited mosaic(s) in {}..{}", tile, len(items), *date_range
         )
         return items
 
