@@ -75,3 +75,53 @@ def test_build_labels_empty_inputs():
     empty = elements_to_polygons([])
     labels = build_labels(empty, empty, _cfg())
     assert labels.empty
+
+
+def _solar(geoms, location_tags=None):
+    n = len(geoms)
+    return gpd.GeoDataFrame(
+        {
+            "osm_type": ["way"] * n,
+            "osm_id": list(range(n)),
+            "tags": ["{}"] * n,
+            "location_tag": location_tags or [None] * n,
+        },
+        geometry=geoms,
+        crs="EPSG:4326",
+    )
+
+
+# two ~700 m² panels (each < 1000 m² threshold), not touching, both on one building
+_SMALL_A = box(6.0002, 51.0002, 6.0005, 51.0005)
+_SMALL_B = box(6.0014, 51.0014, 6.0017, 51.0017)
+_BUILDING = gpd.GeoDataFrame(geometry=[box(6.0, 51.0, 6.002, 51.002)], crs="EPSG:4326")
+
+
+def test_subdivided_array_grouped_per_building():
+    # individually sub-threshold, but their per-building union clears 1000 m²
+    labels = build_labels(_solar([_SMALL_A, _SMALL_B]), _BUILDING, _cfg())
+    assert len(labels) == 1
+    assert labels.iloc[0]["area_m2"] >= 1000
+
+
+def test_subdivided_array_without_building_stays_subthreshold():
+    # no building + the panels don't touch -> no union -> each stays < threshold
+    no_bldg = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+    assert build_labels(_solar([_SMALL_A, _SMALL_B]), no_bldg, _cfg()).empty
+
+
+def test_multiple_generators_collapse_to_one_label():
+    # two large (~1944 m²) generators on the same roof -> one label, not two
+    big = _solar([box(6.0002, 51.0002, 6.0007, 51.0007),
+                  box(6.0012, 51.0012, 6.0017, 51.0017)])
+    assert len(build_labels(big, _BUILDING, _cfg())) == 1
+
+
+def test_solar_on_distinct_buildings_stay_separate():
+    buildings = gpd.GeoDataFrame(
+        geometry=[box(6.0, 51.0, 6.001, 51.001), box(6.0015, 51.0015, 6.0025, 51.0025)],
+        crs="EPSG:4326",
+    )
+    solar = _solar([box(6.0003, 51.0003, 6.0008, 51.0008),
+                    box(6.0017, 51.0017, 6.0022, 51.0022)])
+    assert len(build_labels(solar, buildings, _cfg())) == 2
