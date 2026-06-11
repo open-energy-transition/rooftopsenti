@@ -76,6 +76,10 @@ class ArtifactStore:
     def chips_index(self) -> Path:
         return self.chips_dir / "index.parquet"
 
+    @property
+    def clean_negatives_report(self) -> Path:
+        return self.chips_dir / "clean_negatives_report.json"
+
     def model_dir(self, run_id: str) -> Path:
         return self.root / "models" / run_id
 

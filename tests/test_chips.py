@@ -79,7 +79,7 @@ def test_solar_free_buildings():
         crs="EPSG:4326",
     )
     solar = gpd.GeoDataFrame(geometry=[box(6.0005, 51.0005, 6.0008, 51.0008)], crs="EPSG:4326")
-    free = _solar_free_buildings(buildings, solar)
+    free = _solar_free_buildings(buildings, solar, buffer_m=50.0)
     assert len(free) == 1
     assert free.geometry.iloc[0].bounds[0] == 6.100
 

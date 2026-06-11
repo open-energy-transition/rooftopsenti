@@ -28,7 +28,6 @@ from ..io_artifacts import ArtifactStore, read_gdf, write_gdf
 from ..stac_catalog import composite_assets
 
 NODATA_MAX_FRACTION = 0.5
-SOLAR_FREE_BUFFER_M = 50.0  # negatives must have no OSM solar within this distance
 
 
 def _jittered_window(
@@ -86,14 +85,14 @@ def _write_pair(
 
 
 def _solar_free_buildings(
-    buildings: gpd.GeoDataFrame, all_solar: gpd.GeoDataFrame
+    buildings: gpd.GeoDataFrame, all_solar: gpd.GeoDataFrame, buffer_m: float
 ) -> gpd.GeoDataFrame:
-    """Large buildings with no OSM solar (any size) within SOLAR_FREE_BUFFER_M."""
+    """Large buildings with no OSM solar (any size) within ``buffer_m``."""
     if all_solar.empty:
         return buildings
     b = buildings.to_crs(EQUAL_AREA)
     s = all_solar.to_crs(EQUAL_AREA)
-    s = s.set_geometry(s.geometry.buffer(SOLAR_FREE_BUFFER_M))
+    s = s.set_geometry(s.geometry.buffer(buffer_m))
     joined = gpd.sjoin(b[["geometry"]], s[["geometry"]], how="left", predicate="intersects")
     has_solar = joined.groupby(level=0)["index_right"].apply(lambda v: v.notna().any())
     return buildings[~has_solar.reindex(buildings.index, fill_value=False)]
@@ -150,7 +149,7 @@ def run(cfg: Config, store: ArtifactStore) -> None:
     if labels.empty:
         raise RuntimeError("No OSM labels — cannot build training chips")
 
-    negatives = _solar_free_buildings(buildings, all_solar)
+    negatives = _solar_free_buildings(buildings, all_solar, cfg.chips.solar_free_buffer_m)
     n_neg_target = len(labels) * cfg.chips.pos_per_label * cfg.chips.neg_ratio
     rng = np.random.default_rng(cfg.split.seed)
     if len(negatives) > n_neg_target:

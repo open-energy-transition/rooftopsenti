@@ -58,6 +58,21 @@ def _chip_channels(index) -> int:
         return src.count
 
 
+def drop_cleaned_out(index):
+    """Drop hard negatives flagged by the ``clean-negatives`` stage.
+
+    The flag is optional — indices written before cleaning (or by regions that
+    were never cleaned) simply have no ``cleaned_out`` column and pass through.
+    """
+    if "cleaned_out" not in index.columns:
+        return index
+    keep = ~index["cleaned_out"].fillna(False).astype(bool)
+    n_dropped = int((~keep).sum())
+    if n_dropped:
+        logger.info("Excluding {} cleaned-out hard negative(s) from training", n_dropped)
+    return index[keep].reset_index(drop=True)
+
+
 def load_chip_index(cfg: Config, store: ArtifactStore):
     """Chip index of the primary region plus any ``model.train_regions``.
 
@@ -84,7 +99,7 @@ def load_chip_index(cfg: Config, store: ArtifactStore):
                 f"{cfg.region!r} has {n_channels} — regions must share imagery.bands"
             )
         frames.append(extra)
-    merged = pd.concat(frames, ignore_index=True)
+    merged = drop_cleaned_out(pd.concat(frames, ignore_index=True))
     counts = merged.groupby(["region", "split"]).size()
     logger.info("Training chip pool:\n{}", counts.to_string())
     return merged

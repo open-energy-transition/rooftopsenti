@@ -71,6 +71,23 @@ rooftopsenti report     -c configs/netherlands.yaml
 
 On a machine with an NVIDIA driver use the CUDA env: `pixi run -e cuda rooftopsenti train ...`
 
+### Optional: clean hard negatives (positive-unlabeled mitigation)
+
+Hard negatives are large buildings with no OSM solar nearby - but OSM mapping is never
+complete, so some are really *unmapped* solar. Score them with a baseline model and drop the
+ones it confidently flags as solar, then re-train on the cleaned set:
+
+```bash
+rooftopsenti train           -c configs/netherlands.yaml --run-id baseline
+rooftopsenti clean-negatives -c configs/netherlands.yaml \
+    --model-ckpt data/netherlands/models/baseline/best.ckpt
+rooftopsenti train           -c configs/netherlands.yaml --run-id cleaned
+```
+
+Thresholds are configurable under `clean_negatives` (`prob_threshold`, `max_solar_fraction`);
+the exclusion buffer is `chips.solar_free_buffer_m`. Cleaning is non-destructive (it marks a
+`cleaned_out` column the trainer skips) and idempotent.
+
 ## Regions
 
 Each region is a YAML in `configs/`. The pilot is the **Netherlands** (dense, well-mapped OSM

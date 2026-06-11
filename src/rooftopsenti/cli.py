@@ -89,6 +89,21 @@ def train(config: ConfigOpt, run_id: RunIdOpt = None):
     stage.run(cfg, store, run_id=run_id)
 
 
+@app.command(name="clean-negatives")
+def clean_negatives(
+    config: ConfigOpt, run_id: RunIdOpt = None, model_ckpt: ModelCkptOpt = None
+):
+    """e-clean) Drop hard negatives a baseline model predicts as solar (PU fix).
+
+    Run after a baseline `train`, then re-`train` with a fresh --run-id. Uses the
+    baseline run's checkpoint by default, or --model-ckpt to point at another.
+    """
+    from .stages import clean_negatives as stage
+
+    cfg, store = _setup(config)
+    stage.run(cfg, store, run_id=run_id, model_ckpt=model_ckpt)
+
+
 @app.command()
 def infer(
     config: ConfigOpt,

@@ -143,6 +143,21 @@ class ModelConfig(BaseModel):
 class ChipsConfig(BaseModel):
     pos_per_label: int = 4
     neg_ratio: int = 5
+    # hard negatives must have no OSM solar (any size) within this distance
+    solar_free_buffer_m: float = 50.0
+
+
+class CleanNegativesConfig(BaseModel):
+    """Iterative hard-negative cleaning (positive-unlabeled mitigation).
+
+    A "solar-free" hard negative whose chip a trained baseline model predicts as
+    solar is most likely a building whose solar is simply unmapped in OSM. Such
+    negatives are excluded from the re-training set instead of being taught as
+    true negatives (which would push the model to suppress real detections).
+    """
+
+    prob_threshold: float = 0.5       # per-pixel solar probability counted as "hot"
+    max_solar_fraction: float = 0.05  # drop a negative if more than this fraction of its pixels are hot
 
 
 class PostprocessConfig(BaseModel):
@@ -180,6 +195,7 @@ class Config(BaseModel):
     buildings: BuildingsConfig = BuildingsConfig()
     model: ModelConfig = ModelConfig()
     chips: ChipsConfig = ChipsConfig()
+    clean_negatives: CleanNegativesConfig = CleanNegativesConfig()
     postprocess: PostprocessConfig = PostprocessConfig()
     split: SplitConfig = SplitConfig()
     data_dir: Path = Path("data")
