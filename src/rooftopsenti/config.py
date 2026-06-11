@@ -117,11 +117,9 @@ class ImageryConfig(BaseModel):
         return v
 
 
-class GBAConfig(BaseModel):
-    source: Literal["huggingface", "overture"] = "huggingface"
-    # GBA footprints are split across two HF repos (ODbL bulk + non-ODbL extras)
-    hf_repo_odbl: str = "zhu-xlab/GBA.ODbLPolygon"
-    hf_repo_extra: str = "zhu-xlab/GBA.LoD1"
+class BuildingsConfig(BaseModel):
+    # Building footprints come from Overture Maps (bbox-queryable GeoParquet on
+    # S3 — see the `overture` section for the release pin).
     building_area_min_m2: float = 1000.0
 
 
@@ -179,7 +177,7 @@ class Config(BaseModel):
     overture: OvertureConfig = OvertureConfig()
     osm: OSMConfig = OSMConfig()
     imagery: ImageryConfig
-    gba: GBAConfig = GBAConfig()
+    buildings: BuildingsConfig = BuildingsConfig()
     model: ModelConfig = ModelConfig()
     chips: ChipsConfig = ChipsConfig()
     postprocess: PostprocessConfig = PostprocessConfig()

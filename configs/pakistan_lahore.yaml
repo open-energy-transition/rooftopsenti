@@ -4,7 +4,7 @@
 #
 #   rooftopsenti aoi       -c configs/pakistan_lahore.yaml
 #   rooftopsenti composite -c configs/pakistan_lahore.yaml
-#   rooftopsenti gba       -c configs/pakistan_lahore.yaml
+#   rooftopsenti buildings       -c configs/pakistan_lahore.yaml
 #   rooftopsenti infer     -c configs/pakistan_lahore.yaml \
 #       --model-ckpt data/netherlands/models/8af0b2fbff/best.ckpt
 #   rooftopsenti postprocess -c configs/pakistan_lahore.yaml
@@ -37,8 +37,7 @@ imagery:
   target_resolution_m: 10
   tiles: null
 
-gba:
-  source: overture
+buildings:
   building_area_min_m2: 1000
 
 model:

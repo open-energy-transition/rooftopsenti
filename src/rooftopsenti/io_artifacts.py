@@ -65,12 +65,8 @@ class ArtifactStore:
         return self.composites_dir / "catalog.json"
 
     @property
-    def gba_raw_dir(self) -> Path:
-        return self.root / "gba" / "raw"
-
-    @property
-    def gba_buildings(self) -> Path:
-        return self.root / "gba" / "buildings_filtered.parquet"
+    def buildings(self) -> Path:
+        return self.root / "buildings" / "buildings_filtered.parquet"
 
     @property
     def chips_dir(self) -> Path:

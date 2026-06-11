@@ -28,8 +28,7 @@ imagery:
   target_resolution_m: 10
   tiles: null
 
-gba:
-  source: overture            # smoke: bbox-queryable, avoids multi-GB GBA tile download
+buildings:
   building_area_min_m2: 1000
 
 model:

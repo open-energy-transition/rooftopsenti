@@ -5,7 +5,7 @@ Used for two things:
 - solar generator polygons (``theme=base/type=infrastructure``) with the original
   OSM tags preserved in ``source_tags`` — an Overpass-free label backend;
 - building footprints (``theme=buildings/type=building``) for label building
-  intersection and as the GBA-alternative ROI source.
+  intersection and as the large-building inference ROI source.
 """
 
 from __future__ import annotations
@@ -64,10 +64,12 @@ def parse_osm_record_id(record_id: str | None) -> tuple[str | None, int | None]:
 def solar_generators(
     release: str, bounds: tuple[float, float, float, float], polygons_only: bool = True
 ) -> gpd.GeoDataFrame:
-    """Solar PV generator features with original OSM tags, in a WGS84 bbox.
+    """Solar PV features with original OSM tags, in a WGS84 bbox.
 
-    Returns the same schema as the Overpass backend: ``osm_type``, ``osm_id``,
-    ``tags`` (JSON string), ``location_tag``, polygon geometry.
+    Matches both ``power=generator`` + ``generator:source=solar`` and
+    ``power=plant`` + ``plant:source=solar``. Returns the same schema as the
+    Overpass backend: ``osm_type``, ``osm_id``, ``tags`` (JSON string),
+    ``location_tag``, polygon geometry.
     """
     import json
 
@@ -82,14 +84,15 @@ def solar_generators(
                ST_AsWKB(geometry) AS wkb
         FROM read_parquet('{theme_path(release, "base", "infrastructure")}', hive_partitioning=1)
         WHERE {_bbox_where()}
-          AND subtype = 'power' AND class = 'generator'
-          AND source_tags['generator:source'] = 'solar'
+          AND subtype = 'power'
+          AND (source_tags['generator:source'] = 'solar'
+               OR source_tags['plant:source'] = 'solar')
           {geom_filter}
         """,
         _bbox_params(bounds),
     ).fetchall()
     con.close()
-    logger.info("Overture: {} solar generator polygon(s) in bbox", len(rows))
+    logger.info("Overture: {} solar generator/plant polygon(s) in bbox", len(rows))
 
     if not rows:
         return gpd.GeoDataFrame(

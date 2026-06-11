@@ -1,6 +1,6 @@
 """Stage f) Country-scale inference restricted to large-building ROIs.
 
-For every composite, only patch windows that contain at least one large GBA
+For every composite, only patch windows that contain at least one large
 building are run through the model — empty countryside is skipped entirely.
 Outputs one solar-probability COG per (tile, date-range).
 """
@@ -87,9 +87,9 @@ def run(cfg: Config, store: ArtifactStore, run_id: str | None = None,
     task = SolarSegmentationTask.load_from_checkpoint(str(ckpt), map_location=device)
     model = task.model.to(device).eval()
 
-    buildings = read_gdf(store.gba_buildings)
+    buildings = read_gdf(store.buildings)
     if buildings.empty:
-        raise RuntimeError("No large buildings — run `gba` first")
+        raise RuntimeError("No large buildings — run `buildings` first")
 
     assets = composite_assets(store.stac_catalog)
     for (tile, range_idx), cog in sorted(assets.items()):

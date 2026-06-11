@@ -96,6 +96,8 @@ def solar_query(bbox: tuple[float, float, float, float], timeout_s: int) -> str:
         f'(\n'
         f'  way["power"="generator"]["generator:source"="solar"]{bb};\n'
         f'  relation["power"="generator"]["generator:source"="solar"]{bb};\n'
+        f'  way["power"="plant"]["plant:source"="solar"]{bb};\n'
+        f'  relation["power"="plant"]["plant:source"="solar"]{bb};\n'
         f');\n'
         f"out body geom;"
     )

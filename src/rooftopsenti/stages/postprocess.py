@@ -107,7 +107,7 @@ def run(cfg: Config, store: ArtifactStore, run_id: str | None = None) -> str:
     logger.info("Polygonized {} predicted solar polygon(s)", len(predicted))
     write_gdf(predicted, store.output(run_id, "predicted_solar.parquet"))
 
-    buildings = read_gdf(store.gba_buildings)
+    buildings = read_gdf(store.buildings)
     stats = _aggregate_per_building(predicted, buildings, cfg)
     # inference-only transfer regions may have no OSM solar layer at all — then
     # every detection is a candidate (nothing to mark as already-mapped)

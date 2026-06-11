@@ -30,8 +30,7 @@ imagery:
   target_resolution_m: 10
   tiles: null
 
-gba:
-  source: huggingface        # huggingface (GlobalBuildingAtlas) | overture
+buildings:
   building_area_min_m2: 1000
 
 model:

@@ -1,7 +1,7 @@
 # Multi-region training: Netherlands (primary) + Germany + Pakistan chips.
 #
 # Prerequisites — chips must exist for every region in model.train_regions:
-#   rooftopsenti chips -c configs/germany.yaml     # runs aoi/labels/composite/gba first
+#   rooftopsenti chips -c configs/germany.yaml     # runs aoi/labels/composite/buildings first
 #   rooftopsenti chips -c configs/pakistan.yaml
 #
 # Train/val pools chips from all three regions (each keeps its own spatial
@@ -41,8 +41,7 @@ imagery:
   target_resolution_m: 10
   tiles: null
 
-gba:
-  source: overture
+buildings:
   building_area_min_m2: 1000
 
 model:

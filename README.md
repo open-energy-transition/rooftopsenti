@@ -22,7 +22,7 @@ scale, and flag large buildings that have visible solar but **no solar mapping i
    - `planetary_computer` / `earth_search` - full 10-band L2A scene compositing
      (SCL cloud mask + temporal median); bandwidth-heavy but native 10 m and
      custom date windows.
-4. **Buildings** - fetch [GlobalBuildingAtlas LoD1](https://github.com/zhu-xlab/GlobalBuildingAtlas)
+4. **Buildings** - fetch [Overture Maps buildings](https://docs.overturemaps.org/guides/buildings/)
    footprints and keep only **large buildings** (≥ 1000 m²). These define the inference ROIs.
 5. **Model** - U-Net semantic segmentation ([TorchGeo](https://torchgeo.org/) +
    SSL4EO Sentinel-2 pretrained encoder), trained on chips around OSM labels with hard
@@ -61,7 +61,7 @@ Or stage by stage:
 rooftopsenti aoi        -c configs/netherlands.yaml
 rooftopsenti labels     -c configs/netherlands.yaml
 rooftopsenti composite  -c configs/netherlands.yaml --resume
-rooftopsenti gba        -c configs/netherlands.yaml
+rooftopsenti buildings  -c configs/netherlands.yaml
 rooftopsenti chips      -c configs/netherlands.yaml
 rooftopsenti train      -c configs/netherlands.yaml
 rooftopsenti infer      -c configs/netherlands.yaml --resume
@@ -83,4 +83,4 @@ since OSM cannot be treated as ground truth.
 - Sentinel-2 L2A & quarterly cloudless mosaics: Copernicus, free
 - Earth Genome Sentinel-2 temporal mosaics: CC-BY-4.0, via Source Cooperative
 - OpenStreetMap: © OSM contributors, ODbL
-- GlobalBuildingAtlas (TUM): polygons ODbL; heights/LoD1 CC BY-NC 4.0
+- Overture Maps buildings: ODbL / CDLA-Permissive-2.0 (per-source); © OSM contributors where OSM-derived

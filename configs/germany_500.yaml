@@ -1,0 +1,68 @@
+# Training-label region for the ">=500 m2" run — Germany (densest OSM mapping of
+# large rooftop solar in Europe). This is a CHIP SOURCE for configs/nl_de_500.yaml;
+# it is merged into train/val there via model.train_regions. Generate its chips
+# first (runs aoi/labels/composite/buildings/chips):
+#
+#   pixi run rooftopsenti chips -c configs/germany_500.yaml
+#
+# Distinct region name (germany_500) so its data/ dir and chips never collide with
+# the 1000 m2 pilot config configs/germany.yaml. Bands match nl_de_500/pakistan_500
+# exactly so chips are channel-compatible.
+region: germany_500
+
+aoi:
+  source: geoboundaries
+  iso3: DEU
+  admin_level: 0             # whole country (~110 MGRS tiles). For a faster first
+  admin_name: null           # run, set admin_level: 1 + admin_name: Bayern.
+
+overture:
+  release: "2026-05-20.0"
+
+osm:
+  source: overture           # no rate limits — preferred for training labels
+  overpass_url: https://overpass-api.de/api/interpreter
+  solar_area_min_m2: 500     # >=500 m2 solar polygons count as positives
+  rooftop_rule: intersect_or_roof_tag
+  chunk_deg: 0.5
+  timeout_s: 300
+
+imagery:
+  stac_source: earthgenome   # public HTTPS, no auth; same bands as the other configs
+  collection: sentinel2-temporal-mosaics
+  date_ranges:
+    - ["2023-04-01", "2023-09-30"]   # intersects the 2023 yearly mosaic
+  bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
+  composite_method: median
+  cloud_mask: scl
+  target_resolution_m: 10
+  tiles: null
+
+buildings:
+  building_area_min_m2: 500  # >=500 m2 buildings
+
+model:
+  arch: unet
+  encoder: resnet18
+  pretrained: ssl4eo_s2_moco
+  num_classes: 2
+  loss: focal_dice
+  lr: 1.0e-4
+  batch_size: 32
+  patch_size: 256
+  max_epochs: 60
+  device: auto
+
+chips:
+  pos_per_label: 4
+  neg_ratio: 5
+
+postprocess:
+  prob_threshold: 0.5
+  building_coverage_min: 0.10
+  min_solar_area_m2: 500
+
+split:
+  block_size_km: 25
+  ratios: { train: 0.70, val: 0.15, test: 0.15 }
+  seed: 42

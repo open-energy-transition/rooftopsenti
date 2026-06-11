@@ -36,8 +36,7 @@ imagery:
   target_resolution_m: 10
   tiles: null
 
-gba:
-  source: overture           # bbox-queryable; huggingface needs multi-GB GBA tiles
+buildings:
   building_area_min_m2: 1000
 
 model:

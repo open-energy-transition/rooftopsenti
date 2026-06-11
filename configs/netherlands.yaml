@@ -33,8 +33,7 @@ imagery:
   target_resolution_m: 10
   tiles: null                # optional MGRS whitelist; null = all tiles intersecting AOI
 
-gba:
-  source: overture           # overture (bbox-queryable) | huggingface (GBA, ~23 GB one-time download)
+buildings:
   building_area_min_m2: 1000
 
 model:

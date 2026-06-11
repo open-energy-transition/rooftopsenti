@@ -1,7 +1,7 @@
 """Stage d) Training chips: image/mask pairs around labels + hard negatives.
 
 Positives: ``chips.pos_per_label`` jittered windows per OSM rooftop solar label.
-Hard negatives: windows over large GBA buildings that have no OSM solar nearby —
+Hard negatives: windows over large buildings that have no OSM solar nearby —
 this encodes the positive-unlabeled mitigation (negatives only come from
 buildings in a well-mapped region that are confidently solar-free).
 
@@ -136,14 +136,14 @@ def run(cfg: Config, store: ArtifactStore) -> None:
     # track the composite COGs themselves (size+mtime), not catalog.json —
     # the catalog can be rebuilt/re-registered without the imagery changing
     composite_paths = sorted(composite_assets(store.stac_catalog).values())
-    inputs = [store.osm_labels, store.gba_buildings, *composite_paths]
+    inputs = [store.osm_labels, store.buildings, *composite_paths]
     if store.is_fresh(store.chips_index, cfg_slice, inputs=inputs):
         logger.info("Chips fresh — skipping")
         return
 
     labels = read_gdf(store.osm_labels)
     all_solar = read_gdf(store.osm_solar)
-    buildings = read_gdf(store.gba_buildings)
+    buildings = read_gdf(store.buildings)
     assets = composite_assets(store.stac_catalog)
     if not assets:
         raise RuntimeError("No composites in local STAC catalog — run `composite` first")

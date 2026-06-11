@@ -63,9 +63,9 @@ def composite(config: ConfigOpt, tiles: TilesOpt = None):
 
 
 @app.command()
-def gba(config: ConfigOpt):
-    """f-prep) Fetch large-building inference ROIs (GlobalBuildingAtlas/Overture)."""
-    from .stages import gba as stage
+def buildings(config: ConfigOpt):
+    """f-prep) Fetch large-building inference ROIs (Overture Maps buildings)."""
+    from .stages import buildings as stage
 
     cfg, store = _setup(config)
     stage.run(cfg, store)
@@ -172,9 +172,9 @@ def run_all(config: ConfigOpt, run_id: RunIdOpt = None):
     """Run the full pipeline a->g (each stage skips if fresh)."""
     from .report import build_map
     from .stages import aoi as s_aoi
+    from .stages import buildings as s_buildings
     from .stages import chips as s_chips
     from .stages import composite as s_composite
-    from .stages import gba as s_gba
     from .stages import infer as s_infer
     from .stages import osm_labels as s_labels
     from .stages import postprocess as s_post
@@ -184,7 +184,7 @@ def run_all(config: ConfigOpt, run_id: RunIdOpt = None):
     s_aoi.run(cfg, store)
     s_labels.run(cfg, store)
     s_composite.run(cfg, store)
-    s_gba.run(cfg, store)
+    s_buildings.run(cfg, store)
     s_chips.run(cfg, store)
     rid = s_train.run(cfg, store, run_id=run_id)
     s_infer.run(cfg, store, run_id=rid)
