@@ -21,9 +21,10 @@ import rasterio.features
 import rasterio.windows
 from loguru import logger
 from shapely.geometry import box
+from shapely.strtree import STRtree
 
 from ..config import Config
-from ..geo import EQUAL_AREA, WGS84, spatial_block_id
+from ..geo import EQUAL_AREA, WGS84, mgrs_tile_polygon, spatial_block_id
 from ..io_artifacts import ArtifactStore, read_gdf, write_gdf
 from ..stac_catalog import composite_assets
 
@@ -163,13 +164,23 @@ def run(cfg: Config, store: ArtifactStore) -> None:
     images_dir.mkdir(parents=True, exist_ok=True)
     masks_dir.mkdir(parents=True, exist_ok=True)
 
+    # index once (WGS84) so each tile reprojects only its local labels/negatives
+    # instead of the whole AOI set per composite
+    label_tree = STRtree(list(labels.geometry))
+    neg_tree = STRtree(list(negatives.geometry))
+
     records = []
     patch = cfg.model.patch_size
     for (tile, range_idx), cog in assets.items():
         with rasterio.open(cog) as src:
             raster_bounds = box(*src.bounds)
-            labels_proj = labels.to_crs(src.crs)
-            negatives_proj = negatives.to_crs(src.crs)
+            tile_poly = mgrs_tile_polygon(tile)
+            labels_proj = labels.iloc[
+                label_tree.query(tile_poly, predicate="intersects")
+            ].to_crs(src.crs)
+            negatives_proj = negatives.iloc[
+                neg_tree.query(tile_poly, predicate="intersects")
+            ].to_crs(src.crs)
 
             for kind, gdf, per_geom in (
                 ("pos", labels_proj, cfg.chips.pos_per_label),

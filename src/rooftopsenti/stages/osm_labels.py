@@ -1,8 +1,12 @@
-"""Stage b) OSM training labels: large rooftop solar polygons.
+"""Stage b) OSM training labels: large rooftop solar arrays.
 
-Positives are OSM solar generator polygons that (a) meet the minimum area for
-Sentinel-2 detectability and (b) are rooftop installations — either tagged
-``location=roof`` (or variants) or spatially intersecting a building polygon.
+Positives are rooftop solar arrays that (a) meet the minimum area for Sentinel-2
+detectability and (b) are rooftop installations — either tagged ``location=roof``
+(or variants) or spatially intersecting a building polygon. Solar generator/plant
+polygons are first dissolved into one array per building (or per touching cluster
+when on no building), so the area threshold applies to the whole array: a roof
+mapped as many small panels still yields one detectable label, and multiple
+generator polygons on one roof collapse to a single label.
 
 Backends (``osm.source``):
 - ``overture`` (default) — OSM data redistributed by Overture Maps as
@@ -70,34 +74,74 @@ def _fetch_buildings_near(
     return buildings.drop_duplicates(subset=["osm_type", "osm_id"]).reset_index(drop=True)
 
 
+TAG_COLS = ("osm_type", "osm_id", "location_tag", "tags")
+
+
+def _label_groups(solar: gpd.GeoDataFrame, buildings: gpd.GeoDataFrame) -> tuple[pd.Series, pd.Series]:
+    """Assign each solar polygon a group key + an on-building flag.
+
+    Polygons on the same building footprint share a ``b<idx>`` key (grouped by
+    spatial intersection, not via any OSM relation). Polygons on no building are
+    clustered into ``c<idx>`` keys by dissolving only those that touch/overlap.
+    """
+    if buildings.empty:
+        bldg_of = pd.Series(pd.NA, index=solar.index)
+    else:
+        j = gpd.sjoin(solar[["geometry"]], buildings[["geometry"]], how="left", predicate="intersects")
+        bldg_of = j.groupby(level=0)["index_right"].first().reindex(solar.index)
+    on_building = bldg_of.notna()
+
+    group = pd.Series(index=solar.index, dtype=object)
+    group[on_building] = "b" + bldg_of[on_building].astype("int64").astype(str)
+
+    off = solar.loc[~on_building]
+    if not off.empty:
+        clusters = gpd.GeoDataFrame(
+            geometry=[off.geometry.union_all()], crs=solar.crs
+        ).explode(ignore_index=True)
+        cj = gpd.sjoin(off[["geometry"]], clusters[["geometry"]], how="left", predicate="intersects")
+        cluster_of = cj.groupby(level=0)["index_right"].first().reindex(off.index)
+        group[off.index] = "c" + cluster_of.astype("int64").astype(str)
+    return group, on_building
+
+
 def build_labels(
     solar: gpd.GeoDataFrame, buildings: gpd.GeoDataFrame, cfg: Config
 ) -> gpd.GeoDataFrame:
-    """Filter solar polygons to large rooftop installations."""
-    large = filter_min_area(solar, cfg.osm.solar_area_min_m2)
-    if large.empty:
-        return large.assign(has_roof_tag=[], on_building=[])
+    """One label per rooftop array of large rooftop solar installations.
 
-    has_roof_tag = large["location_tag"].isin(ROOF_VALUES).fillna(False)
+    Solar polygons are dissolved per building (or per touching/overlapping
+    cluster when on no building) *before* the area threshold is applied, so a
+    roof mapped as many small panels yields a single label sized by their union
+    rather than several sub-threshold ones — and multiple generator polygons on
+    one roof collapse to one label instead of oversampling it.
+    """
+    if solar.empty:
+        return solar.assign(has_roof_tag=[], on_building=[])
 
-    if buildings.empty:
-        on_building = pd.Series(False, index=large.index)
-    else:
-        joined = gpd.sjoin(
-            large[["geometry"]], buildings[["geometry"]], how="left", predicate="intersects"
-        )
-        on_building = joined.groupby(level=0)["index_right"].apply(lambda s: s.notna().any())
-        on_building = on_building.reindex(large.index, fill_value=False)
+    solar = solar.copy()
+    solar["_roof"] = solar["location_tag"].isin(ROOF_VALUES).fillna(False)
+    group, on_building = _label_groups(solar, buildings)
+    solar["_group"] = group
+    solar["_on_building"] = on_building.values
 
-    large = large.assign(has_roof_tag=has_roof_tag, on_building=on_building)
+    present_tags = [c for c in TAG_COLS if c in solar.columns]
+    cols = ["_group", "_roof", "_on_building", "geometry", *present_tags]
+    agg = solar[cols].dissolve(
+        by="_group",
+        aggfunc={"_roof": "any", "_on_building": "first", **{c: "first" for c in present_tags}},
+    ).reset_index(drop=True)
+    agg = agg.rename(columns={"_roof": "has_roof_tag", "_on_building": "on_building"})
+
+    agg = filter_min_area(agg, cfg.osm.solar_area_min_m2)
     rule = cfg.osm.rooftop_rule
     if rule == "roof_tag_only":
-        keep = large["has_roof_tag"]
+        keep = agg["has_roof_tag"]
     elif rule == "intersect_only":
-        keep = large["on_building"]
+        keep = agg["on_building"]
     else:  # intersect_or_roof_tag
-        keep = large["has_roof_tag"] | large["on_building"]
-    return large[keep].reset_index(drop=True)
+        keep = agg["has_roof_tag"] | agg["on_building"]
+    return agg[keep].reset_index(drop=True)
 
 
 def _cell_box(cell):
@@ -111,8 +155,9 @@ def _fetch_via_overture(
 ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     solar = overture.solar_generators(cfg.overture.release, boundary.bounds)
     solar = clip_to_geom(solar, boundary).reset_index(drop=True)
-    large_solar = filter_min_area(solar, cfg.osm.solar_area_min_m2)
-    buildings = overture.buildings_intersecting(cfg.overture.release, large_solar)
+    # buildings near *all* solar (incl. small) so subdivided arrays can be
+    # grouped per building and thresholded on their union (see build_labels)
+    buildings = overture.buildings_intersecting(cfg.overture.release, solar)
     return solar, buildings
 
 
@@ -121,11 +166,11 @@ def _fetch_via_overpass(
 ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     client = OverpassClient(cfg.osm.overpass_url, cfg.osm.timeout_s, store.overpass_cache)
     solar = _fetch_solar(client, boundary, cfg)
-    # Only fetch buildings near *large* solar — that's all the rooftop rule needs
-    large_solar = filter_min_area(solar, cfg.osm.solar_area_min_m2)
+    # buildings near *all* solar (incl. small) so subdivided arrays can be
+    # grouped per building and thresholded on their union (see build_labels)
     buildings = (
-        _fetch_buildings_near(client, large_solar, cfg)
-        if not large_solar.empty
+        _fetch_buildings_near(client, solar, cfg)
+        if not solar.empty
         else elements_to_polygons([])
     )
     return solar, buildings
@@ -154,7 +199,10 @@ def run(cfg: Config, store: ArtifactStore) -> None:
 
     labels = build_labels(solar, buildings, cfg)
     logger.info(
-        "Built {} rooftop solar label(s) (≥{} m²)", len(labels), cfg.osm.solar_area_min_m2
+        "Built {} rooftop solar array label(s) (≥{} m² per array) from {} solar polygon(s)",
+        len(labels),
+        cfg.osm.solar_area_min_m2,
+        len(solar),
     )
     write_gdf(labels, store.osm_labels)
     store.write_meta(store.osm_labels, cfg_slice, inputs=[store.aoi_boundary])

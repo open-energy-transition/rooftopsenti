@@ -19,6 +19,7 @@ from shapely.strtree import STRtree
 
 from ..config import Config
 from ..datamodules import REFLECTANCE_SCALE
+from ..geo import mgrs_tile_polygon
 from ..io_artifacts import ArtifactStore, read_gdf
 from ..models import SolarSegmentationTask, resolve_accelerator
 from ..stac_catalog import composite_assets
@@ -90,8 +91,14 @@ def run(cfg: Config, store: ArtifactStore, run_id: str | None = None,
     buildings = read_gdf(store.buildings)
     if buildings.empty:
         raise RuntimeError("No large buildings — run `buildings` first")
+    # index the footprints once (WGS84): each tile then pulls only its local
+    # buildings, instead of reprojecting + indexing the whole AOI set per tile
+    building_tree = STRtree(list(buildings.geometry))
 
     assets = composite_assets(store.stac_catalog)
+    # ROI windows depend only on the tile grid + buildings, so they are identical
+    # across a tile's date ranges — compute once per tile and reuse
+    window_cache: dict[str, tuple[tuple[int, int], list]] = {}
     for (tile, range_idx), cog in sorted(assets.items()):
         if only_tiles and tile not in set(only_tiles):
             continue
@@ -100,8 +107,14 @@ def run(cfg: Config, store: ArtifactStore, run_id: str | None = None,
             logger.info("{} r{}: prediction exists — skipping", tile, range_idx)
             continue
         with rasterio.open(cog) as src:
-            buildings_proj = buildings.to_crs(src.crs)
-            windows = _roi_windows(src, buildings_proj, cfg.model.patch_size)
+            cached = window_cache.get(tile)
+            if cached is not None and cached[0] == (src.height, src.width):
+                windows = cached[1]
+            else:
+                idx = building_tree.query(mgrs_tile_polygon(tile), predicate="intersects")
+                buildings_proj = buildings.iloc[idx].to_crs(src.crs)
+                windows = _roi_windows(src, buildings_proj, cfg.model.patch_size)
+                window_cache[tile] = ((src.height, src.width), windows)
             logger.info(
                 "{} r{}: {} ROI windows (of {} total)",
                 tile,
