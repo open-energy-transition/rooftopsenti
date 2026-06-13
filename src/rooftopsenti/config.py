@@ -118,9 +118,46 @@ class ImageryConfig(BaseModel):
 
 
 class BuildingsConfig(BaseModel):
-    # Building footprints come from Overture Maps (bbox-queryable GeoParquet on
-    # S3 — see the `overture` section for the release pin).
+    # Building footprints come from one or more bbox-queryable GeoParquet
+    # sources (see `sources`). The default is Overture Maps — see the
+    # `overture` section for the release pin.
     building_area_min_m2: float = 1000.0
+    # Inference ROIs include buildings down to this area. Defaults to
+    # building_area_min_m2; set it *lower* to widen recall (smaller buildings
+    # become inference targets) without dragging them into training
+    # hard-negatives, which stay gated at building_area_min_m2.
+    roi_area_min_m2: float | None = None
+    # Metres added to each footprint when selecting ROI windows — absorbs
+    # footprint/imagery misregistration and catches roof-edge panels.
+    roi_buffer_m: float = 0.0
+    # Building footprint sources, unioned and spatially deduped (earlier
+    # sources win on overlap). "vida_open_buildings" is the VIDA Google +
+    # Microsoft combined set — far better Global-South / Pakistan coverage.
+    sources: list[Literal["overture", "vida_open_buildings"]] = Field(
+        default_factory=lambda: ["overture"]
+    )
+    # GeoParquet endpoint for the VIDA combined buildings, partitioned by
+    # country ISO3 ({iso3} placeholder). Override if the public path moves.
+    vida_url_template: str = (
+        "https://data.source.coop/vida/google-microsoft-open-buildings/"
+        "geoparquet/by_country/country_iso={iso3}/{iso3}.parquet"
+    )
+    # Union embedding pre-screen candidate windows (the `embed-screen` stage)
+    # into the ROI set at inference, so PV beyond known footprints (ground
+    # mounts, footprint gaps) is still scored.
+    use_screen_candidates: bool = False
+
+    @property
+    def effective_roi_area_min_m2(self) -> float:
+        """Min footprint area for an inference ROI (falls back to the building min)."""
+        return (
+            self.roi_area_min_m2 if self.roi_area_min_m2 is not None else self.building_area_min_m2
+        )
+
+    @property
+    def fetch_area_min_m2(self) -> float:
+        """Smallest area any consumer needs, so the artifact serves ROIs and negatives."""
+        return min(self.building_area_min_m2, self.effective_roi_area_min_m2)
 
 
 class ModelConfig(BaseModel):
@@ -160,8 +197,27 @@ class CleanNegativesConfig(BaseModel):
     max_solar_fraction: float = 0.05  # drop a negative if more than this fraction of its pixels are hot
 
 
+class ScreenConfig(BaseModel):
+    """Embedding pre-screen: propose ROI windows beyond known building footprints.
+
+    A logistic-regression head is trained on SSL4EO encoder embeddings of the
+    training chips (positive vs. hard-negative), then slid over the composites
+    to flag windows that look like PV — catching ground-mounts and footprints
+    missing from every building source. Enable consumption via
+    ``buildings.use_screen_candidates``.
+    """
+
+    prob_threshold: float = 0.5     # window embedding-prob kept as a candidate
+    stride_frac: float = 1.0        # window stride / patch_size (1.0 = non-overlapping)
+    max_epochs: int = 200           # logistic-regression head training epochs
+    lr: float = 1e-2
+
+
 class PostprocessConfig(BaseModel):
-    prob_threshold: float = 0.5
+    # Recall-first default: detections are human-validated in OSM against
+    # higher-res imagery, so a low threshold (more candidates, more false
+    # positives a reviewer can reject) beats missing real PV.
+    prob_threshold: float = 0.35
     building_coverage_min: float = 0.10
     min_solar_area_m2: float = 1000.0
 
@@ -197,6 +253,7 @@ class Config(BaseModel):
     chips: ChipsConfig = ChipsConfig()
     clean_negatives: CleanNegativesConfig = CleanNegativesConfig()
     postprocess: PostprocessConfig = PostprocessConfig()
+    screen: ScreenConfig = ScreenConfig()
     split: SplitConfig = SplitConfig()
     data_dir: Path = Path("data")
 

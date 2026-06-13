@@ -104,6 +104,28 @@ def clean_negatives(
     stage.run(cfg, store, run_id=run_id, model_ckpt=model_ckpt)
 
 
+@app.command(name="embed-screen")
+def embed_screen(
+    config: ConfigOpt,
+    run_id: RunIdOpt = None,
+    tiles: TilesOpt = None,
+    model_ckpt: ModelCkptOpt = None,
+):
+    """f-screen) Embedding pre-screen: propose ROI windows beyond footprints.
+
+    Trains a logistic-regression head on encoder embeddings of the chips, then
+    scans the composites for PV-like windows. Enable consumption with
+    `buildings.use_screen_candidates: true`, then run `infer`. Use --model-ckpt
+    for transfer (e.g. the trained model on another region's composites).
+    """
+    from .stages import embed_screen as stage
+
+    cfg, store = _setup(config)
+    stage.run(
+        cfg, store, run_id=run_id, only_tiles=_tile_list(tiles), model_ckpt=model_ckpt
+    )
+
+
 @app.command()
 def infer(
     config: ConfigOpt,
@@ -202,6 +224,10 @@ def run_all(config: ConfigOpt, run_id: RunIdOpt = None):
     s_buildings.run(cfg, store)
     s_chips.run(cfg, store)
     rid = s_train.run(cfg, store, run_id=run_id)
+    if cfg.buildings.use_screen_candidates:
+        from .stages import embed_screen as s_screen
+
+        s_screen.run(cfg, store, run_id=rid)
     s_infer.run(cfg, store, run_id=rid)
     s_post.run(cfg, store, run_id=rid)
     build_map(cfg, store, rid)

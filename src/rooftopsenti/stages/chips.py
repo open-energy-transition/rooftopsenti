@@ -144,6 +144,11 @@ def run(cfg: Config, store: ArtifactStore) -> None:
     labels = read_gdf(store.osm_labels)
     all_solar = read_gdf(store.osm_solar)
     buildings = read_gdf(store.buildings)
+    # the buildings artifact may include smaller ROI-only footprints; hard
+    # negatives must stay "large + confidently solar-free", so gate them at
+    # building_area_min_m2 (PU mitigation — see _solar_free_buildings)
+    if not buildings.empty and "area_m2" in buildings.columns:
+        buildings = buildings[buildings["area_m2"] >= cfg.buildings.building_area_min_m2]
     assets = composite_assets(store.stac_catalog)
     if not assets:
         raise RuntimeError("No composites in local STAC catalog — run `composite` first")

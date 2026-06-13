@@ -27,9 +27,15 @@ from ..stac_catalog import composite_assets
 PROB_NODATA = -1.0
 
 
-def _roi_windows(src: rasterio.DatasetReader, buildings_proj, patch: int):
-    """Non-overlapping patch windows intersecting at least one building."""
-    tree = STRtree(list(buildings_proj.geometry))
+def _roi_windows(src: rasterio.DatasetReader, roi_geoms: list, patch: int):
+    """Non-overlapping patch windows intersecting at least one ROI geometry.
+
+    ``roi_geoms`` are in the raster CRS and already include any footprint buffer
+    and embedding-screen candidate boxes.
+    """
+    if not roi_geoms:
+        return []
+    tree = STRtree(roi_geoms)
     windows = []
     for row_off in range(0, src.height, patch):
         for col_off in range(0, src.width, patch):
@@ -38,6 +44,21 @@ def _roi_windows(src: rasterio.DatasetReader, buildings_proj, patch: int):
             if len(tree.query(bounds, predicate="intersects")):
                 windows.append(window)
     return windows
+
+
+def _roi_geoms_for_tile(tile, src, buildings, building_tree, screen, screen_tree, cfg):
+    """Footprint geometries (buffered) + screen candidate boxes for one tile, in src CRS."""
+    tile_poly = mgrs_tile_polygon(tile)
+    idx = building_tree.query(tile_poly, predicate="intersects")
+    geoms = list(buildings.iloc[idx].to_crs(src.crs).geometry)
+    buffer_m = cfg.buildings.roi_buffer_m
+    if buffer_m:
+        geoms = [g.buffer(buffer_m) for g in geoms]
+    if screen is not None:
+        sidx = screen_tree.query(tile_poly, predicate="intersects")
+        if len(sidx):
+            geoms += list(screen.iloc[sidx].to_crs(src.crs).geometry)
+    return geoms
 
 
 @torch.inference_mode()
@@ -89,8 +110,28 @@ def run(cfg: Config, store: ArtifactStore, run_id: str | None = None,
     model = task.model.to(device).eval()
 
     buildings = read_gdf(store.buildings)
-    if buildings.empty:
-        raise RuntimeError("No large buildings — run `buildings` first")
+    # restrict ROIs to footprints >= the (possibly lower) ROI threshold; the
+    # artifact may also hold smaller buildings kept only as training negatives
+    roi_min = cfg.buildings.effective_roi_area_min_m2
+    if not buildings.empty and "area_m2" in buildings.columns:
+        buildings = buildings[buildings["area_m2"] >= roi_min].reset_index(drop=True)
+
+    # optional embedding pre-screen candidates (ground mounts / footprint gaps)
+    screen = None
+    screen_tree = None
+    if cfg.buildings.use_screen_candidates and store.screen_candidates.exists():
+        screen = read_gdf(store.screen_candidates)
+        if not screen.empty:
+            screen_tree = STRtree(list(screen.geometry))
+            logger.info("Using {} embedding-screen candidate window(s) as extra ROIs", len(screen))
+        else:
+            screen = None
+
+    if buildings.empty and screen is None:
+        raise RuntimeError(
+            "No ROIs: run `buildings` first (or enable buildings.use_screen_candidates "
+            "and run `embed-screen`)"
+        )
     # index the footprints once (WGS84): each tile then pulls only its local
     # buildings, instead of reprojecting + indexing the whole AOI set per tile
     building_tree = STRtree(list(buildings.geometry))
@@ -111,9 +152,10 @@ def run(cfg: Config, store: ArtifactStore, run_id: str | None = None,
             if cached is not None and cached[0] == (src.height, src.width):
                 windows = cached[1]
             else:
-                idx = building_tree.query(mgrs_tile_polygon(tile), predicate="intersects")
-                buildings_proj = buildings.iloc[idx].to_crs(src.crs)
-                windows = _roi_windows(src, buildings_proj, cfg.model.patch_size)
+                roi_geoms = _roi_geoms_for_tile(
+                    tile, src, buildings, building_tree, screen, screen_tree, cfg
+                )
+                windows = _roi_windows(src, roi_geoms, cfg.model.patch_size)
                 window_cache[tile] = ((src.height, src.width), windows)
             logger.info(
                 "{} r{}: {} ROI windows (of {} total)",
