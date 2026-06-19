@@ -51,7 +51,7 @@ model:
 
 chips:
   pos_per_label: 4           # jittered patches per positive polygon
-  neg_ratio: 5               # hard-negative : positive patch ratio
+  neg_ratio: 1               # hard-negative : positive patch ratio
 
 postprocess:
   prob_threshold: 0.5

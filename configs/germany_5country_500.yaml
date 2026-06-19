@@ -1,5 +1,5 @@
 # TRAINING config (>=500 m2): Germany (primary) + Switzerland + Netherlands +
-# United Kingdom + New Zealand.
+# United Kingdom + New Zealand + Pakistan.
 #
 # Germany is the primary region: it contributes its own chips AND is the only
 # region used for the held-out test metrics. The other four are merged into
@@ -59,8 +59,8 @@ model:
   arch: unet
   encoder: resnet18
   pretrained: ssl4eo_s2_moco
-  # CH/NL/UK/NZ chips merged into train/val; Germany-only held-out test metrics
-  train_regions: [switzerland_500, netherlands_500, united_kingdom_500, new_zealand_500]
+  # CH/NL/UK/NZ/PK chips merged into train/val; Germany-only held-out test metrics
+  train_regions: [switzerland_500, netherlands_500, united_kingdom_500, new_zealand_500, pakistan_500]
   num_classes: 2
   loss: focal_dice
   lr: 1.0e-4
@@ -71,7 +71,7 @@ model:
 
 chips:
   pos_per_label: 4
-  neg_ratio: 5
+  neg_ratio: 1
 
 postprocess:
   prob_threshold: 0.5

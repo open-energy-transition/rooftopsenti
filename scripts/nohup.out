@@ -1,0 +1,62 @@
+Logging to logs/full_pipeline_20260618_072604.log
+RUN=pixi run rooftopsenti  TRAIN_RUN_ID=de5_500
+==================== data prep: germany_500 ====================
+2026-06-18 07:26:05.639 | INFO     | rooftopsenti.cli:_setup:30 - Region: germany_500 (run id 7dcd27bab3)
+2026-06-18 07:26:05.641 | INFO     | rooftopsenti.stages.aoi:run:64 - AOI artifacts fresh — skipping
+2026-06-18 07:26:06.392 | INFO     | rooftopsenti.cli:_setup:30 - Region: germany_500 (run id 7dcd27bab3)
+2026-06-18 07:26:06.393 | INFO     | rooftopsenti.stages.osm_labels:run:186 - OSM labels fresh — skipping
+2026-06-18 07:26:08.037 | INFO     | rooftopsenti.cli:_setup:30 - Region: germany_500 (run id 7dcd27bab3)
+2026-06-18 07:26:08.136 | INFO     | rooftopsenti.stages.composite:run:363 - 31UGS range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.139 | INFO     | rooftopsenti.stages.composite:run:363 - 31UGT range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.142 | INFO     | rooftopsenti.stages.composite:run:363 - 32TLT range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.145 | INFO     | rooftopsenti.stages.composite:run:363 - 32TMT range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.148 | INFO     | rooftopsenti.stages.composite:run:363 - 32TNT range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.151 | INFO     | rooftopsenti.stages.composite:run:363 - 32TPT range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.155 | INFO     | rooftopsenti.stages.composite:run:363 - 32TQT range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.161 | INFO     | rooftopsenti.stages.composite:run:363 - 32ULA range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.167 | INFO     | rooftopsenti.stages.composite:run:363 - 32ULB range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.173 | INFO     | rooftopsenti.stages.composite:run:363 - 32ULC range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.178 | INFO     | rooftopsenti.stages.composite:run:363 - 32ULD range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.183 | INFO     | rooftopsenti.stages.composite:run:363 - 32ULE range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.188 | INFO     | rooftopsenti.stages.composite:run:363 - 32ULU range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.194 | INFO     | rooftopsenti.stages.composite:run:363 - 32ULV range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.201 | INFO     | rooftopsenti.stages.composite:run:363 - 32UMA range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.208 | INFO     | rooftopsenti.stages.composite:run:363 - 32UMB range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.215 | INFO     | rooftopsenti.stages.composite:run:363 - 32UMC range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.222 | INFO     | rooftopsenti.stages.composite:run:363 - 32UMD range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.229 | INFO     | rooftopsenti.stages.composite:run:363 - 32UME range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.237 | INFO     | rooftopsenti.stages.composite:run:363 - 32UMF range 0: fresh — re-registered, skipping
+2026-06-18 07:26:08.238 | INFO     | rooftopsenti.stages.composite:run:388 - Processing 57 tile(s) with 4 parallel worker(s)
+2026-06-18 07:26:09.531 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32TLU: 0 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:09.531 | WARNING  | rooftopsenti.stages.composite:_composite_one:434 - 32TLU range 0: no items found — skipping
+2026-06-18 07:26:09.605 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32TNU: 0 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:09.605 | WARNING  | rooftopsenti.stages.composite:_composite_one:434 - 32TNU range 0: no items found — skipping
+2026-06-18 07:26:09.623 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32TPU: 0 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:09.623 | WARNING  | rooftopsenti.stages.composite:_composite_one:434 - 32TPU range 0: no items found — skipping
+2026-06-18 07:26:09.938 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32TMU: 0 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:09.938 | WARNING  | rooftopsenti.stages.composite:_composite_one:434 - 32TMU range 0: no items found — skipping
+2026-06-18 07:26:10.517 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32TQU: 0 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:10.517 | WARNING  | rooftopsenti.stages.composite:_composite_one:434 - 32TQU range 0: no items found — skipping
+2026-06-18 07:26:10.627 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32UKB: 0 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:10.627 | WARNING  | rooftopsenti.stages.composite:_composite_one:434 - 32UKB range 0: no items found — skipping
+2026-06-18 07:26:10.715 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32UKA: 0 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:10.715 | WARNING  | rooftopsenti.stages.composite:_composite_one:434 - 32UKA range 0: no items found — skipping
+2026-06-18 07:26:11.110 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32UKC: 0 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:11.110 | WARNING  | rooftopsenti.stages.composite:_composite_one:434 - 32UKC range 0: no items found — skipping
+2026-06-18 07:26:11.474 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32UMU: 1 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:11.635 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32UMV: 1 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:11.742 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32UNA: 1 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:12.164 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32UNB: 1 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:26:21.776 | INFO     | rooftopsenti.stages.composite:_composite_one:440 - 32UNA range 0: computing median composite ...
+2026-06-18 07:26:22.962 | INFO     | rooftopsenti.stages.composite:_composite_one:440 - 32UMU range 0: computing median composite ...
+2026-06-18 07:26:24.377 | INFO     | rooftopsenti.stages.composite:_composite_one:440 - 32UMV range 0: computing median composite ...
+2026-06-18 07:26:26.896 | INFO     | rooftopsenti.stages.composite:_composite_one:440 - 32UNB range 0: computing median composite ...
+2026-06-18 07:47:03.211 | INFO     | rooftopsenti.stages.composite:_composite_one:464 - 32UMU range 0: composite written -> data/germany_500/composites/32UMU/composite_0.tif
+2026-06-18 07:47:07.745 | INFO     | rooftopsenti.stages.composite:_composite_one:464 - 32UNA range 0: composite written -> data/germany_500/composites/32UNA/composite_0.tif
+2026-06-18 07:47:10.831 | INFO     | rooftopsenti.stages.composite:_composite_one:464 - 32UNB range 0: composite written -> data/germany_500/composites/32UNB/composite_0.tif
+2026-06-18 07:47:13.900 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32UNC: 1 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:47:14.004 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32UND: 1 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:47:13.979 | INFO     | rooftopsenti.stages.composite:_search_items:156 - 32UNE: 1 pre-composited mosaic(s) in 2023-04-01..2023-09-30
+2026-06-18 07:47:28.293 | INFO     | rooftopsenti.stages.composite:_composite_one:440 - 32UNC range 0: computing median composite ...
+2026-06-18 07:47:28.320 | INFO     | rooftopsenti.stages.composite:_composite_one:440 - 32UNE range 0: computing median composite ...
+2026-06-18 07:47:28.391 | INFO     | rooftopsenti.stages.composite:_composite_one:440 - 32UND range 0: computing median composite ...

@@ -131,7 +131,9 @@ class ArtifactStore:
             return False
         recorded = meta.get("inputs", {})
         current = {str(p): self._file_state(p) for p in (inputs or []) if p.exists()}
-        return recorded == current
+        # Inputs that were recorded but have since been deleted (e.g. composites pruned
+        # after chipping) are skipped — only inputs that still exist are compared.
+        return {k: v for k, v in recorded.items() if k in current} == current
 
 
 def _jsonify(obj: dict) -> dict:

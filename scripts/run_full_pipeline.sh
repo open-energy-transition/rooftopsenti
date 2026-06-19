@@ -2,18 +2,23 @@
 #
 # Full rooftop-solar pipeline, end to end:
 #   1. Train a >=500 m2 model on Germany (primary/held-out test) + Switzerland +
-#      Netherlands + United Kingdom + New Zealand (pooled train/val).
-#   2. Transfer-infer that model over Pakistan and build the missing-in-OSM report.
+#      Netherlands + United Kingdom + New Zealand + Pakistan (pooled train/val).
+#   2. Infer that model over Pakistan and build the missing-in-OSM report.
 #
 # Designed to run unattended on Linux / Windows-WSL. No Claude required.
+#
+# Disk management: composites (~95 GB each) are deleted immediately after chipping
+# so only one region's composites are on disk at a time. All training chips are
+# deleted after training completes (model checkpoint is kept). This keeps peak
+# usage to ~175 GB, well within a 229 GB disk.
 #
 # ---------------------------------------------------------------------------
 # Quick start (inside WSL, from the repo root):
 #   pixi install
 #   bash scripts/run_full_pipeline.sh
 #
-# On a machine with an NVIDIA GPU (driver on Windows, CUDA in WSL):
-#   RUN="pixi run -e cuda rooftopsenti" bash scripts/run_full_pipeline.sh
+# CPU-only fallback (no GPU):
+#   RUN="pixi run rooftopsenti" bash scripts/run_full_pipeline.sh
 #
 # It is a long job (country-scale Sentinel-2 mosaics + 60-epoch training), so run
 # it detached, e.g.:   nohup bash scripts/run_full_pipeline.sh &   (then watch logs/)
@@ -27,7 +32,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Override-able knobs (env vars):
-RUN="${RUN:-pixi run rooftopsenti}"          # use "pixi run -e cuda rooftopsenti" for GPU
+RUN="${RUN:-pixi run -e cuda rooftopsenti}"  # use "pixi run rooftopsenti" for CPU-only
 TRAIN_RUN_ID="${TRAIN_RUN_ID:-de5_500}"      # deterministic name for the trained model
 
 TRAIN_CONFIG=configs/germany_5country_500.yaml
@@ -42,7 +47,20 @@ echo "Logging to $LOG"
 echo "RUN=$RUN  TRAIN_RUN_ID=$TRAIN_RUN_ID"
 
 # ============================ 1. TRAIN ============================
-# Per-region data prep (Germany first, then the pooled contributors).
+# Pakistan is chipped first so its composites (~200 GB) are deleted before the
+# European regions' chips accumulate. Composites are re-downloaded at inference.
+echo "==================== Pakistan training data prep ===================="
+$RUN aoi       -c "$PK"
+$RUN labels    -c "$PK"            # OSM solar used as training positives
+$RUN composite -c "$PK"
+$RUN buildings -c "$PK"
+$RUN chips     -c "$PK"
+echo "--- pruning Pakistan composites (will be re-downloaded for inference) ---"
+rm -rf "data/pakistan_500/composites/"
+echo "--- composites deleted; disk free: $(df -h /run/media/tobi/aidisc/ | awk 'NR==2{print $4}') ---"
+
+# Per-region data prep for the European training regions.
+# Composites are deleted right after chipping to reclaim ~95 GB per region.
 REGIONS=(germany_500 switzerland_500 netherlands_500 united_kingdom_500 new_zealand_500)
 for region in "${REGIONS[@]}"; do
   cfg="configs/${region}.yaml"
@@ -52,6 +70,10 @@ for region in "${REGIONS[@]}"; do
   $RUN composite -c "$cfg"
   $RUN buildings -c "$cfg"
   $RUN chips     -c "$cfg"
+
+  echo "--- pruning composites for ${region} to reclaim disk ---"
+  rm -rf "data/${region}/composites/"
+  echo "--- composites deleted; disk free: $(df -h /run/media/tobi/aidisc/ | awk 'NR==2{print $4}') ---"
 done
 
 echo "==================== train pooled model (${TRAIN_RUN_ID}) ===================="
@@ -63,15 +85,18 @@ if [[ ! -f "$CKPT" ]]; then
   exit 1
 fi
 
-# ===================== 2. PAKISTAN INFERENCE =====================
-# Transfer inference: the trained model is applied to Pakistan composites.
-echo "==================== Pakistan data prep ===================="
-$RUN aoi       -c "$PK"
-$RUN buildings -c "$PK"            # >=500 m2 building ROIs
-$RUN composite -c "$PK"            # Sentinel-2 mosaics (the slow step)
-$RUN labels    -c "$PK"            # fresh OSM solar for the missing-in-OSM audit
+echo "--- pruning all training chips to reclaim disk for Pakistan inference composites ---"
+for region in "${REGIONS[@]}"; do
+  rm -rf "data/${region}/chips/"
+done
+rm -rf "data/pakistan_500/chips/"
+echo "--- chips deleted; disk free: $(df -h /run/media/tobi/aidisc/ | awk 'NR==2{print $4}') ---"
 
-echo "==================== Pakistan transfer inference ===================="
+# ===================== 2. PAKISTAN INFERENCE =====================
+# Re-download Pakistan composites (deleted after training chips to save disk).
+# OSM labels are already fresh from the training prep step above.
+echo "==================== Pakistan inference ===================="
+$RUN composite   -c "$PK"            # re-download Sentinel-2 mosaics
 $RUN infer       -c "$PK" --model-ckpt "$CKPT"
 $RUN postprocess -c "$PK"
 $RUN report      -c "$PK"

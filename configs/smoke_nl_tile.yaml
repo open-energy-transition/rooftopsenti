@@ -45,7 +45,7 @@ model:
 
 chips:
   pos_per_label: 2
-  neg_ratio: 2
+  neg_ratio: 1
 
 postprocess:
   prob_threshold: 0.5

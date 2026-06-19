@@ -54,8 +54,8 @@ model:
   device: auto
 
 chips:
-  pos_per_label: 4
-  neg_ratio: 5
+  pos_per_label: 2
+  neg_ratio: 0.5
 
 postprocess:
   prob_threshold: 0.5
