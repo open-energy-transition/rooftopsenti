@@ -99,9 +99,9 @@ for region in "${REGIONS[@]}"; do
     echo "--- composites deleted; free: $(df -h /run/media/tobi/aidisc/ | awk 'NR==2{print $4}') ---"
 done
 
-echo "==================== train pooled model (${TRAIN_RUN_ID}) ===================="
-$RUN train    -c "$TRAIN_CONFIG" --run-id "$TRAIN_RUN_ID"
-$RUN validate -c "$TRAIN_CONFIG" --run-id "$TRAIN_RUN_ID"
+hr; log "########## TRAIN POOLED MODEL (${TRAIN_RUN_ID}) ##########"; hr
+run_stage "train (${TRAIN_RUN_ID})"    "60-epoch U-Net training — LONG; watch the tqdm epoch bars below" 1 -- $RUN train    -c "$TRAIN_CONFIG" --run-id "$TRAIN_RUN_ID"
+run_stage "validate (${TRAIN_RUN_ID})" "Germany held-out test metrics"                                  1 -- $RUN validate -c "$TRAIN_CONFIG" --run-id "$TRAIN_RUN_ID"
 
 if [[ ! -f "$CKPT" ]]; then
     echo "ERROR: expected checkpoint not found at $CKPT" >&2
