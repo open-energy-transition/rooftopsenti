@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 import time
 from pathlib import Path
 
@@ -21,7 +22,9 @@ from shapely.ops import unary_union
 from .geo import WGS84
 
 RETRY_STATUS = {406, 429, 502, 503, 504}
-MAX_RETRIES = 8
+MAX_RETRIES = 16
+_MAX_DELAY = 300.0      # longest single wait between retries (seconds)
+_RATE_LIMIT_DELAY = 60.0  # minimum wait after a 429 (overrides normal backoff)
 
 # Public mirrors rotated on retry when the primary instance load-sheds.
 MIRRORS = [
@@ -33,10 +36,17 @@ USER_AGENT = "rooftopsenti/0.1 (large rooftop solar PV mapping; +https://github.
 
 
 class OverpassClient:
-    def __init__(self, url: str, timeout_s: int, cache_dir: Path):
+    def __init__(
+        self,
+        url: str,
+        timeout_s: int,
+        cache_dir: Path,
+        inter_request_delay_s: float = 2.0,
+    ):
         self.urls = [url] + [m for m in MIRRORS if m != url]
         self.timeout_s = timeout_s
         self.cache_dir = cache_dir
+        self.inter_request_delay_s = inter_request_delay_s
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _cache_path(self, ql: str) -> Path:
@@ -58,6 +68,14 @@ class OverpassClient:
                     timeout=self.timeout_s,
                     headers={"User-Agent": USER_AGENT},
                 )
+                if resp.status_code == 429:
+                    # Respect Retry-After if the server provides it; otherwise
+                    # use a long floor so we don't keep hammering a rate-limited API.
+                    retry_after = float(resp.headers.get("Retry-After", _RATE_LIMIT_DELAY))
+                    delay = max(delay, retry_after)
+                    raise httpx.HTTPStatusError(
+                        f"retryable status 429", request=resp.request, response=resp
+                    )
                 if resp.status_code in RETRY_STATUS:
                     raise httpx.HTTPStatusError(
                         f"retryable status {resp.status_code}", request=resp.request, response=resp
@@ -65,20 +83,26 @@ class OverpassClient:
                 resp.raise_for_status()
                 payload = resp.json()
                 cache.write_text(json.dumps(payload))
+                # Pace requests so we don't immediately trigger the next rate limit.
+                if self.inter_request_delay_s > 0:
+                    time.sleep(self.inter_request_delay_s)
                 return payload
             except (httpx.TransportError, httpx.HTTPStatusError, ValueError) as exc:
                 if attempt == MAX_RETRIES - 1:
                     raise
+                # Add ±20 % jitter so parallel/repeated runs don't thunderherd.
+                jitter = 0.8 + 0.4 * random.random()
+                actual_delay = delay * jitter
                 logger.warning(
                     "Overpass request to {} failed ({}), retry {}/{} in {:.0f}s",
                     url,
                     exc,
                     attempt + 1,
                     MAX_RETRIES,
-                    delay,
+                    actual_delay,
                 )
-                time.sleep(delay)
-                delay = min(delay * 2, 120)
+                time.sleep(actual_delay)
+                delay = min(delay * 2, _MAX_DELAY)
         raise RuntimeError("unreachable")
 
 

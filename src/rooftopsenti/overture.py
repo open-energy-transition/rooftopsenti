@@ -29,6 +29,12 @@ def connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
     con.execute("INSTALL httpfs; LOAD httpfs; INSTALL spatial; LOAD spatial;")
     con.execute("SET s3_region='us-west-2';")
+    # Generous timeout + built-in DuckDB retries for flaky S3 connections
+    # (Pakistan bbox touches ~140 parquet shards; default 30 s is too short).
+    con.execute("SET http_timeout=300000;")   # 5 min per request
+    con.execute("SET http_retries=8;")
+    con.execute("SET http_retry_backoff=2;")
+    con.execute("SET http_retry_wait_ms=2000;")
     return con
 
 

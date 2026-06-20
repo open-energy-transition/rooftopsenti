@@ -72,12 +72,12 @@ def buildings(config: ConfigOpt):
 
 
 @app.command()
-def chips(config: ConfigOpt):
+def chips(config: ConfigOpt, tiles: TilesOpt = None):
     """d) Generate training chips + spatial train/val/test split."""
     from .stages import chips as stage
 
     cfg, store = _setup(config)
-    stage.run(cfg, store)
+    stage.run(cfg, store, only_tiles=_tile_list(tiles))
 
 
 @app.command()

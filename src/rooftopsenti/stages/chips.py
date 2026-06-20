@@ -123,7 +123,7 @@ def _assign_splits(index: gpd.GeoDataFrame, cfg: Config) -> gpd.GeoDataFrame:
     return index.assign(split=index["block"].map(split_of))
 
 
-def run(cfg: Config, store: ArtifactStore) -> None:
+def run(cfg: Config, store: ArtifactStore, only_tiles: list[str] | None = None) -> None:
     cfg_slice = {
         "chips": cfg.chips.model_dump(mode="json"),
         "split": cfg.split.model_dump(mode="json"),
@@ -137,9 +137,19 @@ def run(cfg: Config, store: ArtifactStore) -> None:
     # the catalog can be rebuilt/re-registered without the imagery changing
     composite_paths = sorted(composite_assets(store.stac_catalog).values())
     inputs = [store.osm_labels, store.buildings, *composite_paths]
-    if store.is_fresh(store.chips_index, cfg_slice, inputs=inputs):
-        logger.info("Chips fresh — skipping")
-        return
+
+    if only_tiles is not None:
+        # Batch mode: skip global freshness check; instead check if these specific
+        # tiles are already in the index (allows resuming a crashed batch run).
+        if store.chips_index.exists():
+            existing_tiles = set(read_gdf(store.chips_index)["tile"].unique())
+            if set(only_tiles).issubset(existing_tiles):
+                logger.info("Chips already present for tiles {} — skipping", only_tiles)
+                return
+    else:
+        if store.is_fresh(store.chips_index, cfg_slice, inputs=inputs):
+            logger.info("Chips fresh — skipping")
+            return
 
     labels = read_gdf(store.osm_labels)
     all_solar = read_gdf(store.osm_solar)
@@ -149,8 +159,15 @@ def run(cfg: Config, store: ArtifactStore) -> None:
     # building_area_min_m2 (PU mitigation — see _solar_free_buildings)
     if not buildings.empty and "area_m2" in buildings.columns:
         buildings = buildings[buildings["area_m2"] >= cfg.buildings.building_area_min_m2]
-    assets = composite_assets(store.stac_catalog)
+    all_assets = composite_assets(store.stac_catalog)
+    assets = (
+        {k: v for k, v in all_assets.items() if k[0] in set(only_tiles)}
+        if only_tiles else all_assets
+    )
     if not assets:
+        if only_tiles:
+            logger.warning("No composites found for tiles {} — skipping", only_tiles)
+            return
         raise RuntimeError("No composites in local STAC catalog — run `composite` first")
     if labels.empty:
         raise RuntimeError("No OSM labels — cannot build training chips")
@@ -227,15 +244,29 @@ def run(cfg: Config, store: ArtifactStore) -> None:
                         )
 
     if not records:
+        if only_tiles:
+            logger.warning("No chips generated for tiles {} — skipping", only_tiles)
+            return
         raise RuntimeError("No chips generated — check composites and labels overlap")
-    index = gpd.GeoDataFrame(pd.DataFrame(records), geometry="geometry", crs=WGS84)
-    index = _assign_splits(index, cfg)
+    new_chips = gpd.GeoDataFrame(pd.DataFrame(records), geometry="geometry", crs=WGS84)
+    new_chips = _assign_splits(new_chips, cfg)
     logger.info(
         "Generated {} chips ({} pos / {} neg); splits: {}",
-        len(index),
-        (index["kind"] == "pos").sum(),
-        (index["kind"] == "neg").sum(),
-        index["split"].value_counts().to_dict(),
+        len(new_chips),
+        (new_chips["kind"] == "pos").sum(),
+        (new_chips["kind"] == "neg").sum(),
+        new_chips["split"].value_counts().to_dict(),
     )
+    if only_tiles and store.chips_index.exists():
+        # Batch mode: append to existing index, replacing any prior entries for
+        # these tiles (idempotent on re-run).
+        existing = read_gdf(store.chips_index)
+        existing = existing[~existing["tile"].isin(set(only_tiles))]
+        index = gpd.GeoDataFrame(
+            pd.concat([existing, new_chips], ignore_index=True), crs=WGS84
+        )
+    else:
+        index = new_chips
     write_gdf(index, store.chips_index)
-    store.write_meta(store.chips_index, cfg_slice, inputs=inputs)
+    if only_tiles is None:
+        store.write_meta(store.chips_index, cfg_slice, inputs=inputs)

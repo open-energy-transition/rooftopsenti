@@ -179,7 +179,7 @@ class ModelConfig(BaseModel):
 
 class ChipsConfig(BaseModel):
     pos_per_label: int = 4
-    neg_ratio: int = 5
+    neg_ratio: float = 5
     # hard negatives must have no OSM solar (any size) within this distance
     solar_free_buffer_m: float = 50.0
 
