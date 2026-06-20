@@ -173,7 +173,7 @@ def run(cfg: Config, store: ArtifactStore, only_tiles: list[str] | None = None) 
         raise RuntimeError("No OSM labels — cannot build training chips")
 
     negatives = _solar_free_buildings(buildings, all_solar, cfg.chips.solar_free_buffer_m)
-    n_neg_target = len(labels) * cfg.chips.pos_per_label * cfg.chips.neg_ratio
+    n_neg_target = int(len(labels) * cfg.chips.pos_per_label * cfg.chips.neg_ratio)
     rng = np.random.default_rng(cfg.split.seed)
     if len(negatives) > n_neg_target:
         negatives = negatives.sample(n=n_neg_target, random_state=cfg.split.seed)
