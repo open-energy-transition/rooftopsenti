@@ -27,6 +27,9 @@ Every composite is written as a COG and registered in a local STAC catalog.
 
 from __future__ import annotations
 
+import os
+import random
+import time
 from pathlib import Path
 
 import numpy as np
@@ -137,7 +140,21 @@ NODATA = 0
 
 def _search_items(tile: str, date_range: tuple[str, str], cfg: Config):
     spec = _source_spec(cfg)
-    catalog = pystac_client.Client.open(cfg.imagery.stac_url, modifier=spec["modifier"])
+    # Retry the STAC connection — DNS failures are transient and should not kill a tile.
+    _MAX_STAC_RETRIES = 6
+    for attempt in range(_MAX_STAC_RETRIES):
+        try:
+            catalog = pystac_client.Client.open(cfg.imagery.stac_url, modifier=spec["modifier"])
+            break
+        except Exception as exc:
+            if attempt == _MAX_STAC_RETRIES - 1:
+                raise
+            delay = (2 ** attempt) * (0.8 + 0.4 * random.random())
+            logger.warning(
+                "STAC connect failed for {} ({}), retry {}/{} in {:.0f}s",
+                tile, exc, attempt + 1, _MAX_STAC_RETRIES, delay,
+            )
+            time.sleep(delay)
     query = dict(spec["tile_query"](tile))
     if not spec["precomposited"]:
         # mosaic items carry no eo:cloud_cover — they are already cloud-free
@@ -379,15 +396,24 @@ def _composite_one(
         logger.info("{} range {}: computing median composite ...", tile, range_idx)
         comp = comp.compute()
         if int((np.asarray(comp.values) != NODATA).sum()) == 0:
-            # With fail_on_error=False, failed reads (e.g. bad/expired S3
-            # credentials) silently become nodata — surface that loudly instead
-            # of leaving a stale composite from a previous config in place.
-            raise RuntimeError(
-                f"{tile} range {range_idx}: composite is all-nodata. Items were "
-                "found, so reads likely failed — check credentials "
-                "(CDSE_S3_ACCESS_KEY/CDSE_S3_SECRET_KEY for cdse_mosaics) and "
-                "network, then re-run `composite`."
+            # For credential-gated sources (cdse_mosaics) all-nodata almost always
+            # means bad/expired keys — raise so the user is told explicitly.
+            # For public sources (earthgenome, earth_search, planetary_computer)
+            # it means the mosaic genuinely has no valid pixels for this tile
+            # (e.g. permanent glaciers, scene gaps) — skip with a warning instead
+            # of blocking the whole batch.
+            if cfg.imagery.stac_source == "cdse_mosaics":
+                raise RuntimeError(
+                    f"{tile} range {range_idx}: composite is all-nodata. Items were "
+                    "found, so reads likely failed — check credentials "
+                    "(CDSE_S3_ACCESS_KEY/CDSE_S3_SECRET_KEY for cdse_mosaics) and "
+                    "network, then re-run `composite`."
+                )
+            logger.warning(
+                "{} range {}: composite is all-nodata (no valid pixels in mosaic) — skipping",
+                tile, range_idx,
             )
+            return
         _write_cog(comp, out_path)
 
     register_composite(

@@ -41,12 +41,26 @@ echo "Logging to $LOG"
 echo "RUN=$RUN  TRAIN_RUN_ID=$TRAIN_RUN_ID  BATCH_SIZE=$BATCH_SIZE"
 
 # ---------------------------------------------------------------------------
-# Helper: process a region's tiles in batches (composite → action → delete).
-# Usage: tile_batches <config> <action_fn_name>
-# The action receives the comma-separated tile list as $1.
+# Retry wrapper: re-runs a command up to 4 times on failure with exponential
+# backoff (30 s → 60 s → 120 s → 240 s). Handles transient DNS errors,
+# S3 timeouts, and unexpected kills.
+# ---------------------------------------------------------------------------
+_retry() {
+    local max=4 attempt=0 delay=30
+    while true; do
+        "$@" && return 0
+        attempt=$((attempt + 1))
+        [[ $attempt -ge $max ]] && { echo "--- FATAL: command failed after $max attempts: $*" >&2; return 1; }
+        echo "--- attempt $attempt/$max failed, retrying in ${delay}s: $* ---"
+        sleep "$delay"
+        delay=$((delay * 2))
+    done
+}
+
+# ---------------------------------------------------------------------------
+# Helper: process Pakistan tiles in batches (composite → action → delete).
 # ---------------------------------------------------------------------------
 _pk_tile_list() {
-    # Read tile list from the AOI artifact written by `aoi`.
     python3 -c "import json; print(' '.join(json.load(open('data/pakistan_500/aoi/mgrs_tiles.json'))))"
 }
 
@@ -63,9 +77,9 @@ _run_pk_batch() {
         local batch_num=$((i/BATCH_SIZE+1))
         echo "--- Pakistan ${action} batch ${batch_num}/${total_batches}: ${#batch[@]} tiles ---"
 
-        $RUN composite -c "$PK" --tiles "$batch_str"
+        _retry $RUN composite -c "$PK" --tiles "$batch_str"
         # shellcheck disable=SC2086
-        $RUN "$action"  -c "$PK" --tiles "$batch_str" $extra
+        $RUN "$action" -c "$PK" --tiles "$batch_str" $extra
 
         for tile in "${batch[@]}"; do
             rm -rf "data/pakistan_500/composites/${tile}/"
@@ -90,7 +104,7 @@ for region in "${REGIONS[@]}"; do
     echo "==================== data prep: ${region} ===================="
     $RUN aoi       -c "$cfg"
     $RUN labels    -c "$cfg"
-    $RUN composite -c "$cfg"
+    _retry $RUN composite -c "$cfg"
     $RUN buildings -c "$cfg"
     $RUN chips     -c "$cfg"
 
@@ -99,9 +113,9 @@ for region in "${REGIONS[@]}"; do
     echo "--- composites deleted; free: $(df -h /run/media/tobi/aidisc/ | awk 'NR==2{print $4}') ---"
 done
 
-hr; log "########## TRAIN POOLED MODEL (${TRAIN_RUN_ID}) ##########"; hr
-run_stage "train (${TRAIN_RUN_ID})"    "60-epoch U-Net training — LONG; watch the tqdm epoch bars below" 1 -- $RUN train    -c "$TRAIN_CONFIG" --run-id "$TRAIN_RUN_ID"
-run_stage "validate (${TRAIN_RUN_ID})" "Germany held-out test metrics"                                  1 -- $RUN validate -c "$TRAIN_CONFIG" --run-id "$TRAIN_RUN_ID"
+echo "==================== train pooled model (${TRAIN_RUN_ID}) ===================="
+$RUN train    -c "$TRAIN_CONFIG" --run-id "$TRAIN_RUN_ID"
+$RUN validate -c "$TRAIN_CONFIG" --run-id "$TRAIN_RUN_ID"
 
 if [[ ! -f "$CKPT" ]]; then
     echo "ERROR: expected checkpoint not found at $CKPT" >&2
@@ -114,7 +128,6 @@ rm -rf "data/pakistan_500/chips/"
 echo "--- chips deleted; free: $(df -h /run/media/tobi/aidisc/ | awk 'NR==2{print $4}') ---"
 
 # ===================== 2. PAKISTAN INFERENCE =====================
-# OSM labels already fresh from training prep above.
 echo "==================== Pakistan inference (batched) ===================="
 _run_pk_batch infer "--model-ckpt $CKPT --run-id $TRAIN_RUN_ID"
 
