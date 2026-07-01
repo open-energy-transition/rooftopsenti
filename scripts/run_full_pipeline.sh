@@ -64,6 +64,22 @@ _pk_tile_list() {
     python3 -c "import json; print(' '.join(json.load(open('data/pakistan_500/aoi/mgrs_tiles.json'))))"
 }
 
+_pk_batch_chips_done() {
+    # Returns 0 if all tiles in the comma-separated list are already in the chips index.
+    local batch_str="$1"
+    pixi run python -c "
+import sys
+try:
+    import geopandas as gpd
+    idx = gpd.read_parquet('data/pakistan_500/chips/index.parquet')[['tile']]
+    existing = set(idx['tile'].unique())
+    needed = set('${batch_str}'.split(','))
+    sys.exit(0 if needed.issubset(existing) else 1)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null
+}
+
 _run_pk_batch() {
     local action="$1"   # "chips" or "infer"
     local extra="${2:-}"
@@ -76,6 +92,11 @@ _run_pk_batch() {
         local batch_str=$(IFS=,; echo "${batch[*]}")
         local batch_num=$((i/BATCH_SIZE+1))
         echo "--- Pakistan ${action} batch ${batch_num}/${total_batches}: ${#batch[@]} tiles ---"
+
+        if [[ "$action" == "chips" ]] && _pk_batch_chips_done "$batch_str"; then
+            echo "--- batch ${batch_num} chips already present for all tiles — skipping composite+chips ---"
+            continue
+        fi
 
         _retry $RUN composite -c "$PK" --tiles "$batch_str"
         # shellcheck disable=SC2086
