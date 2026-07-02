@@ -7,7 +7,7 @@ aoi:
   bbox: [6.10, 51.30, 6.25, 51.45]   # W, S, E, N (Venlo logistics corridor)
 
 overture:
-  release: "2026-05-20.0"
+  release: "2026-06-17.0"
 
 osm:
   source: overture           # overture (default, no rate limits) | overpass (live OSM)
@@ -18,10 +18,10 @@ osm:
   timeout_s: 180
 
 imagery:
-  stac_source: earthgenome          # pre-composited yearly mosaics; public, no auth
-  collection: sentinel2-temporal-mosaics
+  stac_source: planetary_computer          # per-scene S2 L2A, no auth (anonymous SAS signing)
+  collection: sentinel-2-l2a
   date_ranges:
-    - ["2023-06-01", "2023-07-31"]  # intersects the 2023 yearly mosaic
+    - ["2025-06-01", "2025-07-31"]  # scene search window
   bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
   composite_method: median
   cloud_mask: scl

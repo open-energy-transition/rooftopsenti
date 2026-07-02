@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import os
 
 import geopandas as gpd
 import httpx
@@ -24,6 +25,7 @@ def _fetch_geoboundaries(cfg: Config) -> gpd.GeoDataFrame:
         download_url = meta["gjDownloadURL"]
         logger.info("Downloading boundary GeoJSON: {}", download_url)
         geojson_bytes = client.get(download_url).raise_for_status().content
+    os.environ.setdefault("OGR_GEOJSON_MAX_OBJ_SIZE", "0")
     gdf = gpd.read_file(io.BytesIO(geojson_bytes))
     if cfg.aoi.admin_name:
         match = gdf[gdf["shapeName"].str.casefold() == cfg.aoi.admin_name.casefold()]

@@ -80,6 +80,20 @@ def chips(config: ConfigOpt, tiles: TilesOpt = None):
     stage.run(cfg, store, only_tiles=_tile_list(tiles))
 
 
+@app.command(name="pack-chips")
+def pack_chips(config: ConfigOpt):
+    """d2) Pack chips into one HDF5 for fast training reads (HDD-friendly).
+
+    Optional but strongly recommended on spinning disks: training otherwise
+    opens two GeoTIFFs per sample. The datamodule picks the pack up
+    automatically when it is fresh w.r.t. the chip index.
+    """
+    from .stages import pack_chips as stage
+
+    cfg, store = _setup(config)
+    stage.run(cfg, store)
+
+
 @app.command()
 def train(config: ConfigOpt, run_id: RunIdOpt = None):
     """e) Train the segmentation model."""
@@ -214,6 +228,7 @@ def run_all(config: ConfigOpt, run_id: RunIdOpt = None):
     from .stages import composite as s_composite
     from .stages import infer as s_infer
     from .stages import osm_labels as s_labels
+    from .stages import pack_chips as s_pack
     from .stages import postprocess as s_post
     from .stages import train as s_train
 
@@ -223,6 +238,7 @@ def run_all(config: ConfigOpt, run_id: RunIdOpt = None):
     s_composite.run(cfg, store)
     s_buildings.run(cfg, store)
     s_chips.run(cfg, store)
+    s_pack.run(cfg, store)
     rid = s_train.run(cfg, store, run_id=run_id)
     if cfg.buildings.use_screen_candidates:
         from .stages import embed_screen as s_screen

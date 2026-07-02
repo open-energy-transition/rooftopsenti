@@ -31,6 +31,7 @@ for region in "${REGIONS[@]}"; do
   $RUN composite -c "$cfg"
   $RUN buildings -c "$cfg"
   $RUN chips     -c "$cfg"
+  $RUN pack-chips -c "$cfg"   # one HDF5 per region: fast training reads on HDD
 done
 
 echo "==================== train: pooled 5-country model ===================="

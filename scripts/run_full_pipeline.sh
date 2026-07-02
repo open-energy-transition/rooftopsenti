@@ -117,6 +117,8 @@ $RUN aoi       -c "$PK"
 $RUN labels    -c "$PK"
 $RUN buildings -c "$PK"
 _run_pk_batch chips
+# pack once after all batches — the index is complete only now
+$RUN pack-chips -c "$PK"
 
 # --- European training regions (composites deleted after chipping) ---
 REGIONS=(germany_500 switzerland_500 netherlands_500 united_kingdom_500 new_zealand_500)
@@ -128,6 +130,7 @@ for region in "${REGIONS[@]}"; do
     _retry $RUN composite -c "$cfg"
     $RUN buildings -c "$cfg"
     $RUN chips     -c "$cfg"
+    $RUN pack-chips -c "$cfg"   # one HDF5 per region: fast training reads on HDD
 
     echo "--- pruning composites for ${region} ---"
     rm -rf "data/${region}/composites/"

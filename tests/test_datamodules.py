@@ -2,11 +2,13 @@ import geopandas as gpd
 import numpy as np
 import pytest
 import rasterio
+import torch
 from shapely.geometry import box
 
 from rooftopsenti.config import Config
-from rooftopsenti.datamodules import load_chip_index
+from rooftopsenti.datamodules import ChipDataset, load_chip_index
 from rooftopsenti.io_artifacts import ArtifactStore
+from rooftopsenti.stages import pack_chips
 
 UTM = "EPSG:32631"
 
@@ -25,7 +27,7 @@ def _cfg(tmp_path, region="nl", train_regions=()):
 
 def _write_region_chips(tmp_path, region, n, n_bands, splits):
     chips_dir = tmp_path / region / "chips"
-    (chips_dir / "images").mkdir(parents=True)
+    (chips_dir / "images").mkdir(parents=True, exist_ok=True)
     rows = []
     transform = rasterio.transform.from_origin(500000, 5700000, 10, 10)
     for i in range(n):
@@ -68,6 +70,51 @@ def test_channel_mismatch_raises(tmp_path):
     cfg = _cfg(tmp_path, "nl", ["de"])
     with pytest.raises(ValueError, match="channels"):
         load_chip_index(cfg, ArtifactStore(cfg))
+
+
+def test_packed_h5_matches_tiff_reads(tmp_path):
+    _write_region_chips(tmp_path, "nl", 3, 4, ["train", "val", "train"])
+    cfg = _cfg(tmp_path, "nl")
+    store = ArtifactStore(cfg)
+    pack_chips.run(cfg, store)
+
+    index = load_chip_index(cfg, store)
+    assert index["h5_path"].notna().all()
+    ds_h5 = ChipDataset(index, augment=False)
+    ds_tif = ChipDataset(index.drop(columns=["h5_path", "h5_row"]), augment=False)
+    for i in range(len(ds_h5)):
+        assert torch.equal(ds_h5[i]["image"], ds_tif[i]["image"])
+        assert torch.equal(ds_h5[i]["mask"], ds_tif[i]["mask"])
+
+
+def test_stale_h5_pack_falls_back_to_tiffs(tmp_path):
+    _write_region_chips(tmp_path, "nl", 2, 3, ["train", "val"])
+    cfg = _cfg(tmp_path, "nl")
+    store = ArtifactStore(cfg)
+    pack_chips.run(cfg, store)
+
+    # rewriting the index (e.g. a chips re-run) must invalidate the pack
+    _write_region_chips(tmp_path, "nl", 2, 3, ["train", "val"])
+    index = load_chip_index(cfg, store)
+    assert index["h5_path"].isna().all()
+    sample = ChipDataset(index, augment=False)[0]
+    assert sample["image"].shape == (3, 8, 8)
+
+
+def test_multi_region_pack_rows_survive_concat(tmp_path):
+    # only one of two regions is packed; rows must keep per-region h5 rows
+    _write_region_chips(tmp_path, "nl", 3, 3, ["train", "val", "test"])
+    _write_region_chips(tmp_path, "de", 2, 3, ["train", "train"])
+    cfg = _cfg(tmp_path, "nl", ["de"])
+    store = ArtifactStore(cfg)
+    pack_chips.run(cfg, store)
+
+    index = load_chip_index(cfg, store)
+    nl = index[index["region"] == "nl"]
+    de = index[index["region"] == "de"]
+    assert nl["h5_path"].notna().all()
+    assert list(nl["h5_row"]) == [0, 1, 2]
+    assert de["h5_path"].isna().all()
 
 
 def test_train_regions_change_run_id(tmp_path):

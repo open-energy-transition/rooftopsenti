@@ -27,10 +27,14 @@ aoi:
   admin_name: null
 
 overture:
-  release: "2026-05-20.0"
+  release: "2026-06-17.0"
 
 osm:
-  source: overpass           # live OSM for the missing-in-OSM audit (freshest existing solar)
+  # Overture redistributes OSM as bbox-queryable GeoParquet — no Overpass rate
+  # limits (which stalled the label fetch for hours). The snapshot lags live OSM
+  # by ~a month; re-run `labels` with source: overpass before postprocess if the
+  # missing-in-OSM audit needs the freshest possible OSM state.
+  source: overture
   overpass_url: https://overpass-api.de/api/interpreter
   solar_area_min_m2: 500
   rooftop_rule: intersect_or_roof_tag
@@ -38,10 +42,10 @@ osm:
   timeout_s: 300
 
 imagery:
-  stac_source: earthgenome   # MUST match the training bands for the checkpoint to load
-  collection: sentinel2-temporal-mosaics
+  stac_source: planetary_computer   # MUST match the training bands for the checkpoint to load
+  collection: sentinel-2-l2a
   date_ranges:
-    - ["2023-02-01", "2023-12-31"]   # the 2023 yearly mosaic
+    - ["2026-02-01", "2026-06-30"]   # scene search window
   bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
   composite_method: median
   cloud_mask: scl

@@ -15,8 +15,8 @@ def test_shipped_configs_load(name):
     cfg = load_config(CONFIGS_DIR / f"{name}.yaml")
     # nl_de_pk is a multi-region *training* config rooted in the NL region
     assert cfg.region == ("netherlands" if name == "nl_de_pk" else name)
-    # all shipped configs use the Earth Genome mosaics (full 10-band stack)
-    assert cfg.imagery.stac_source == "earthgenome"
+    # all shipped configs use Planetary Computer L2A scenes (full 10-band stack)
+    assert cfg.imagery.stac_source == "planetary_computer"
     assert cfg.in_channels == len(cfg.imagery.bands) == 10
 
 

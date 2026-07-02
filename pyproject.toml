@@ -12,6 +12,7 @@ dependencies = [
     "shapely>=2.0",
     "pyproj>=3.6",
     "pyogrio",
+    "pyarrow",
     "rioxarray",
     "xarray",
     "dask",
@@ -24,6 +25,7 @@ dependencies = [
     "segmentation-models-pytorch",
     "lightning",
     "httpx",
+    "h5py>=3.11",
     "duckdb",
     "typer",
     "pydantic>=2",
@@ -67,9 +69,12 @@ geopandas = ">=1.0"
 shapely = ">=2.0"
 pyproj = ">=3.6"
 pyogrio = "*"
+pyarrow = "*"
 rioxarray = "*"
 xarray = "*"
-dask = "*"
+# odc-loader needs dask.typing.Key; an unconstrained solve once downgraded
+# dask to 2023.3.0 to satisfy the cuda stack and broke the composite stage
+dask = ">=2025"
 mgrs = "*"
 # STAC
 pystac = ">=1.10"
@@ -84,6 +89,7 @@ lightning = "*"
 timm = "*"
 # data access / misc
 httpx = "*"
+h5py = ">=3.11"
 python-duckdb = "*"
 typer = "*"
 pydantic = ">=2"
@@ -105,6 +111,13 @@ omnicloudmask = "*"
 # Opt-in CUDA environment: `pixi run -e cuda ...` on a machine with NVIDIA driver
 [tool.pixi.feature.cuda.system-requirements]
 cuda = "12"
+
+[tool.pixi.feature.cuda.dependencies]
+# without this the solver happily picks the cpu_mkl pytorch build and the
+# "cuda" env silently trains on CPU; cuda-version is capped at 12.6 because
+# later builds drop Pascal (sm_61, GTX 10xx) kernels
+pytorch-gpu = "*"
+cuda-version = "12.6.*"
 
 [tool.pixi.environments]
 default = { solve-group = "default" }

@@ -4,8 +4,8 @@
 #
 #   pixi run rooftopsenti chips -c configs/new_zealand_500.yaml
 #
-# Southern hemisphere: the date range only selects the 2023 *yearly* cloud-free
-# mosaic (which is already season-agnostic), so no seasonal change is needed.
+# Southern hemisphere: scenes are searched within the date range, so it is set
+# to the 2023/24 southern summer (high sun angle, no snow).
 region: new_zealand_500
 
 aoi:
@@ -15,7 +15,7 @@ aoi:
   admin_name: null
 
 overture:
-  release: "2026-05-20.0"
+  release: "2026-06-17.0"
 
 osm:
   source: overture           # no rate limits — preferred for training labels
@@ -26,10 +26,10 @@ osm:
   timeout_s: 300
 
 imagery:
-  stac_source: earthgenome   # public HTTPS, no auth; global yearly cloud-free mosaics
-  collection: sentinel2-temporal-mosaics
+  stac_source: planetary_computer   # per-scene S2 L2A, no auth (anonymous SAS signing)
+  collection: sentinel-2-l2a
   date_ranges:
-    - ["2023-04-01", "2023-09-30"]   # intersects the 2023 yearly mosaic
+    - ["2025-11-01", "2026-03-31"]   # scene search window (southern summer)
   bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
   composite_method: median
   cloud_mask: scl

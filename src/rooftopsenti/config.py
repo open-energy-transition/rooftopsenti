@@ -35,7 +35,7 @@ class AOIConfig(BaseModel):
 
 
 class OvertureConfig(BaseModel):
-    release: str = "2026-05-20.0"
+    release: str = "2026-06-17.0"
 
 
 class OSMConfig(BaseModel):

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import h5py
 import numpy as np
 import pandas as pd
 import rasterio
@@ -29,16 +32,33 @@ def load_mask(path: str) -> torch.Tensor:
 
 class ChipDataset(Dataset):
     def __init__(self, index, augment: bool):
-        self.items = index[["image", "mask"]].to_dict("records")
+        cols = [c for c in ("image", "mask", "h5_path", "h5_row") if c in index.columns]
+        self.items = index[cols].to_dict("records")
         self.augment = augment
+        # opened lazily so each DataLoader worker gets its own handle — h5py
+        # handles must not cross the fork boundary
+        self._h5_files: dict[str, h5py.File] = {}
 
     def __len__(self) -> int:
         return len(self.items)
 
+    def _h5(self, path: str) -> h5py.File:
+        f = self._h5_files.get(path)
+        if f is None:
+            f = self._h5_files[path] = h5py.File(path, "r")
+        return f
+
     def __getitem__(self, i: int) -> dict[str, torch.Tensor]:
         rec = self.items[i]
-        image = load_image(rec["image"])
-        mask = load_mask(rec["mask"])
+        if rec.get("h5_path"):
+            f = self._h5(rec["h5_path"])
+            row = int(rec["h5_row"])
+            img = f["images"][row].astype(np.float32) / REFLECTANCE_SCALE
+            image = torch.from_numpy(np.clip(img, 0.0, 1.0))
+            mask = torch.from_numpy(f["masks"][row].astype(np.int64))
+        else:
+            image = load_image(rec["image"])
+            mask = load_mask(rec["mask"])
         if self.augment:
             if torch.rand(1) < 0.5:
                 image = torch.flip(image, [-1])
@@ -54,8 +74,31 @@ class ChipDataset(Dataset):
 
 
 def _chip_channels(index) -> int:
-    with rasterio.open(index.iloc[0]["image"]) as src:
+    first = index.iloc[0]
+    if first.get("h5_path"):  # works even after chip TIFFs were pruned
+        with h5py.File(first["h5_path"], "r") as f:
+            return f["images"].shape[1]
+    with rasterio.open(first["image"]) as src:
         return src.count
+
+
+def _attach_h5(index, chips_dir: Path):
+    """Point chips at the packed HDF5 (``pack-chips`` stage) when it is fresh.
+
+    ``h5_row`` is the positional row in that region's index.parquet, so it must
+    be assigned here — before ``drop_cleaned_out`` filtering or multi-region
+    concat reorder anything. A stale/absent pack falls back to per-chip TIFFs.
+    """
+    h5_path = chips_dir / "chips.h5"
+    if ArtifactStore.is_fresh(h5_path, {}, inputs=[chips_dir / "index.parquet"]):
+        logger.info("Reading chips from packed HDF5 {}", h5_path)
+        return index.assign(h5_path=str(h5_path), h5_row=np.arange(len(index)))
+    logger.info(
+        "No fresh chip pack at {} — reading individual TIFFs "
+        "(run `rooftopsenti pack-chips` to speed up training on HDD)",
+        h5_path,
+    )
+    return index.assign(h5_path=None, h5_row=-1)
 
 
 def drop_cleaned_out(index):
@@ -79,7 +122,7 @@ def load_chip_index(cfg: Config, store: ArtifactStore):
     Each region keeps its own spatial-block split assignment; a ``region``
     column is added so evaluation can be restricted to the primary region.
     """
-    index = read_gdf(store.chips_index).assign(region=cfg.region)
+    index = _attach_h5(read_gdf(store.chips_index), store.chips_dir).assign(region=cfg.region)
     frames = [index]
     n_channels = _chip_channels(index)
     for region in cfg.model.train_regions:
@@ -91,7 +134,7 @@ def load_chip_index(cfg: Config, store: ArtifactStore):
                 f"model.train_regions includes {region!r} but {path} does not exist "
                 f"— run `rooftopsenti chips -c configs/{region}.yaml` first"
             )
-        extra = read_gdf(path).assign(region=region)
+        extra = _attach_h5(read_gdf(path), path.parent).assign(region=region)
         extra_channels = _chip_channels(extra)
         if extra_channels != n_channels:
             raise ValueError(

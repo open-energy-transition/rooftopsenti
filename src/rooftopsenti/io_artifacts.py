@@ -77,6 +77,10 @@ class ArtifactStore:
         return self.chips_dir / "index.parquet"
 
     @property
+    def chips_h5(self) -> Path:
+        return self.chips_dir / "chips.h5"
+
+    @property
     def clean_negatives_report(self) -> Path:
         return self.chips_dir / "clean_negatives_report.json"
 
@@ -107,20 +111,22 @@ class ArtifactStore:
         st = path.stat()
         return f"{st.st_size}:{st.st_mtime_ns}"
 
-    def write_meta(
-        self, artifact: Path, config_slice: dict, inputs: list[Path] | None = None
-    ) -> None:
+    # static so freshness can also be checked for artifacts of *other* regions
+    # (e.g. train_regions chip packs), where no Config/store is at hand
+    @staticmethod
+    def write_meta(artifact: Path, config_slice: dict, inputs: list[Path] | None = None) -> None:
         meta = {
             "config": _jsonify(config_slice),
-            "inputs": {str(p): self._file_state(p) for p in (inputs or []) if p.exists()},
+            "inputs": {
+                str(p): ArtifactStore._file_state(p) for p in (inputs or []) if p.exists()
+            },
             "written_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
-        self._meta_path(artifact).write_text(json.dumps(meta, indent=2, sort_keys=True))
+        ArtifactStore._meta_path(artifact).write_text(json.dumps(meta, indent=2, sort_keys=True))
 
-    def is_fresh(
-        self, artifact: Path, config_slice: dict, inputs: list[Path] | None = None
-    ) -> bool:
-        meta_path = self._meta_path(artifact)
+    @staticmethod
+    def is_fresh(artifact: Path, config_slice: dict, inputs: list[Path] | None = None) -> bool:
+        meta_path = ArtifactStore._meta_path(artifact)
         if not artifact.exists() or not meta_path.exists():
             return False
         try:
@@ -130,7 +136,7 @@ class ArtifactStore:
         if meta.get("config") != _jsonify(config_slice):
             return False
         recorded = meta.get("inputs", {})
-        current = {str(p): self._file_state(p) for p in (inputs or []) if p.exists()}
+        current = {str(p): ArtifactStore._file_state(p) for p in (inputs or []) if p.exists()}
         # Inputs that were recorded but have since been deleted (e.g. composites pruned
         # after chipping) are skipped — only inputs that still exist are compared.
         return {k: v for k, v in recorded.items() if k in current} == current
