@@ -1,5 +1,7 @@
 # rooftopsenti
 
+⚠️ This is a discontinued prototype. Please don't depend or use this project, without direction contact to the main developers. ⚠️ 
+
 Detect **large rooftop solar PV** installations from Sentinel-2 imagery at country/state/province
 scale, and flag large buildings that have visible solar but **no solar mapping in OSM**.
 
